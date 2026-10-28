@@ -1,0 +1,11 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nex"
+version = "0.1.0"
+description = "AI software engineering platform."
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+readme = "README.md"
