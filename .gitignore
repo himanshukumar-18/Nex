@@ -61,3 +61,6 @@ coverage.xml
 *.temp
 tmp/
 temp/
+
+# Python package metadata
+*.egg-info/
