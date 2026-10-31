@@ -2,7 +2,7 @@
 
 NEX is a proprietary, full-stack AI software engineering platform that helps developers understand, modify, test, review, and ship code through intelligent automation.
 
-> **Project status: Step 5A Core Backend Architecture Implemented & Verified.** Django 5.2 core backend architecture is active with centralized API exception handling, Redis-backed sliding-window rate limiting (atomic Lua scripts, 10-category fail-closed/fail-open policies, anti-spoofing proxy resolution), correlation ID tracking (`X-Correlation-Id`), unified pagination (`NexCursorPagination` with tie-breaking), and a 95-test automated suite (all passing). PostgreSQL 17 with `pgvector` (v0.8.7) and Redis 7.4 are fully operational across all 5 healthy Docker services.
+> **Project status: Step 8 React Frontend Foundation Implemented & Verified.** React 18+ web management interface established with strict JavaScript (ES Modules, zero TypeScript), distinctive Cyber Brutalist visual identity, modern web standards (native `<dialog>` modals with overscroll containment), centralized Redux Toolkit state management (`uiSlice`), Axios client with correlation ID propagation and Django error envelope normalization (`errorHandler.js`), responsive layouts (`AppLayout`, `PublicLayout`, `AuthLayout`), and a 27-test automated component/unit suite (all passing). Combined platform automated test coverage: **167/167 verified tests passing** (106 Django backend + 34 FastAPI agent-runtime + 27 React frontend). PostgreSQL 17 with `pgvector` (v0.8.7) and Redis 7.4 are operational across all 5 healthy Docker services.
 
 ---
 
@@ -23,7 +23,8 @@ NEX is a proprietary, full-stack AI software engineering platform that helps dev
 | Backend API | Django + Django REST Framework | 5.2.3 / 3.16.0 |
 | AI Agent Runtime | FastAPI + uvicorn | 0.115.14 / 0.34.3 |
 | Agent Orchestration | LangGraph | Planned |
-| Web Frontend | React | Planned |
+| Web Frontend | React 18 + Vite 6 + Tailwind CSS | 18.3.1 / 6.2.0 |
+| Frontend State | Redux Toolkit | 2.6.0 |
 | CLI | Python | ≥ 3.12 |
 | Primary Database | PostgreSQL + pgvector | pg17 (vector 0.8.7) |
 | Cache / Queue | Redis | 7.4.4-alpine |
@@ -59,7 +60,7 @@ NEX is a proprietary, full-stack AI software engineering platform that helps dev
 - **Abstract Base Models**: All future models inherit from `apps.core.models.BaseModel` (UUIDv4 primary keys and automated timestamp auditing).
 - **Distributed Rate Limiting**: Redis-backed sliding-window counter using atomic Lua scripts (O(1) memory, privacy-masked client identifiers, configurable fail-open policy).
 - **Centralized Exception Handling & Tracing**: All API errors conform to a unified JSON envelope (`error`, `message`, `detail`), and every request is tracked across workers with a UUID4 `X-Correlation-Id`.
-- **Automated Test Coverage**: **140 verified tests passing across the stack** (106 Django backend tests + 34 FastAPI agent-runtime tests), plus live inter-container integration verified.
+- **Automated Test Coverage**: **167 verified tests passing across the stack** (106 Django backend tests + 34 FastAPI agent-runtime tests + 27 React frontend tests), plus live inter-container integration verified.
 
 See [DIRECTORY.md](DIRECTORY.md) for detailed architecture, security decisions, and verification records.
 
@@ -108,6 +109,30 @@ docker compose ps                               # all 5 should report (healthy)
 curl http://localhost:8080/health/              # Liveness probe  → {"status":"ok"}
 curl http://localhost:8080/health/ready/        # Readiness probe → {"status":"ready","database":"connected"}
 curl http://localhost:8080/nginx-health         # Nginx probe     → {"status":"ok"}
+```
+
+---
+
+## Frontend Development Commands
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Start Vite development server (port 3000, proxies /api to port 8080)
+npm run dev
+
+# Run Vitest automated component and unit test suite
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Build production bundle to dist/
+npm run build
+
+# Preview production build locally
+npm run preview
 ```
 
 ---

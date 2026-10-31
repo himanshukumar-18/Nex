@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   NEX Cyber Brutalist Design Tokens
+   ========================================================================== */
+
+:root {
+  /* Surfaces */
+  --color-bg-primary: #09090f;
+  --color-bg-secondary: #12121c;
+  --color-surface-elevated: #191927;
+
+  /* Accents */
+  --color-accent-primary: #8b5cf6;
+  --color-accent-secondary: #00d9ff;
+  --color-accent-highlight: #c4b5fd;
+
+  /* Typography */
+  --color-text-primary: #f5f3ff;
+  --color-text-secondary: #a1a1b5;
+
+  /* Structural */
+  --color-border: #303044;
+  --color-border-active: #8b5cf6;
+
+  /* Status Tokens */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+}
+
+/* ==========================================================================
+   Modern Web Standards & Overlay Behaviors
+   ========================================================================== */
+
+/*
+ * Modern Web Guidance: stop background scrolling without locking html/body overflow.
+ * dialog:modal and dialog::backdrop overscroll-behavior containment.
+ */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background-color: rgba(9, 9, 15, 0.82);
+  backdrop-filter: blur(4px);
+}
+
+/* ==========================================================================
+   Cyber Brutalist Scrollbars
+   ========================================================================== */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+  border-left: 1px solid var(--color-border);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #303044;
+  border: 1px solid #191927;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent-primary);
+}
+
+/* ==========================================================================
+   Utility Classes & Component Enhancements
+   ========================================================================== */
+
+@layer utilities {
+  .border-brutal {
+    border: 1.5px solid var(--color-border);
+  }
+
+  .border-brutal-accent {
+    border: 1.5px solid var(--color-accent-primary);
+  }
+
+  .border-brutal-cyan {
+    border: 1.5px solid var(--color-accent-secondary);
+  }
+
+  .bg-grid-pattern {
+    background-size: 32px 32px;
+    background-image: 
+      linear-gradient(to right, rgba(48, 48, 68, 0.25) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(48, 48, 68, 0.25) 1px, transparent 1px);
+  }
+
+  .text-glow-accent {
+    text-shadow: 0 0 12px rgba(139, 92, 246, 0.5);
+  }
+
+  .text-glow-cyan {
+    text-shadow: 0 0 12px rgba(0, 217, 255, 0.5);
+  }
+}
+

@@ -1,6 +1,6 @@
 # NEX — Repository Directory
 
-> **Status: Step 6F Django ↔ FastAPI Backend Communication Implemented & Verified** — Secure, resilient inter-service communication between Django Core Backend and FastAPI Agent Runtime is established. Implements Django-side dedicated `AgentRuntimeClient` (thread-safe connection pooling via `httpx.Client`, explicit timeout matrix, safe idempotent GET retries, zero non-idempotent retries, SSRF/traversal protection, and `X-Correlation-Id` propagation), FastAPI constant-time service authentication (`InternalServiceAuthMiddleware` using `secrets.compare_digest` with zero-downtime key rotation via primary and fallback keys), true dynamic streaming request body size enforcement (HTTP 413 on chunked/streamed transfers), typed request/response contracts, and centralized normalized error responses. Combined platform test suite: **140/140 passing tests** (106 Django backend + 34 FastAPI agent-runtime) plus live end-to-end container integration verified. All 5 Docker development services are healthy.
+> **Status: Step 8 React Frontend Foundation Implemented & Verified** — Production-grade React web foundation established with strict JavaScript (ES Modules, zero TypeScript), Cyber Brutalist visual identity, and modern web standards. Features centralized Redux Toolkit state management (`uiSlice` with persistent drawer preferences and toast system), Axios HTTP client with automated `X-Correlation-Id` propagation and Django error envelope normalization (`errorHandler.js`), HTML5 native `<dialog>` modals with `overscroll-behavior: contain` and light dismiss, responsive application layouts (`AppLayout`, `PublicLayout`, `AuthLayout`), comprehensive Cyber Brutalist component kit (Buttons, Inputs, Selects, Checkboxes, Badges, Tabs, Tables, Skeletons, ErrorBoundary, EmptyState, ErrorState, Alerts, Toasts), and full page shells (`DashboardPage`, `ProjectsPage`, `RunsPage`, `ApprovalsPage`, `HistoryPage`, `SettingsPage`, `NotFoundPage`). Combined platform automated tests: **167/167 passing tests** (106 Django backend + 34 FastAPI agent-runtime + 27 React frontend). Production build tested and verified via Vite. All 5 Docker development services healthy.
 
 ---
 
@@ -123,17 +123,77 @@ nex - ai software engineer/
 │       └── ui/
 │   └── tests/
 │
-├── frontend/                            # React web application (dirs only, no source)
-│   ├── public/
-│   └── src/
-│       ├── components/
-│       ├── features/
-│       ├── hooks/
-│       ├── layouts/
-│       ├── lib/
-│       ├── pages/
-│       ├── services/
-│       └── store/
+├── frontend/                            # React web application (Step 8 Foundation)
+│   ├── index.html                       # HTML entry point with Cyber Brutalist fonts
+│   ├── package.json                     # Frontend dependencies & scripts (pure JS)
+│   ├── vite.config.js                   # Vite config, dev server proxy & Vitest setup
+│   ├── tailwind.config.js               # Cyber Brutalist tokens, colors, & typography
+│   ├── postcss.config.js                # PostCSS Tailwind & Autoprefixer plugin config
+│   ├── public/                          # Static assets and icons
+│   ├── src/                             # Application source code (strict JS/JSX)
+│   │   ├── main.jsx                     # React DOM entry point & Providers mount
+│   │   ├── app/
+│   │   │   ├── store.js                 # Centralized Redux Toolkit store
+│   │   │   ├── hooks.js                 # Typed React-Redux hook wrappers
+│   │   │   ├── router.jsx               # React Router DOM route definitions
+│   │   │   └── providers.jsx            # Provider composition (Redux + ErrorBoundary)
+│   │   ├── components/
+│   │   │   ├── ui/                      # Cyber Brutalist UI Kit
+│   │   │   │   ├── Button.jsx           # Variants (primary, secondary, outline, danger, cyan)
+│   │   │   │   ├── Input.jsx            # Form input with icon, error, and monospace styling
+│   │   │   │   ├── Textarea.jsx         # Multiline cyber brutalist input
+│   │   │   │   ├── Select.jsx           # Form select with custom chevron indicator
+│   │   │   │   ├── Checkbox.jsx         # Custom square high-contrast checkbox
+│   │   │   │   ├── Badge.jsx            # Status & tag badges with optional pulse dot
+│   │   │   │   ├── Modal.jsx            # Native HTML5 <dialog> with overscroll containment
+│   │   │   │   ├── ConfirmDialog.jsx    # Destructive action confirmation modal
+│   │   │   │   ├── Tooltip.jsx          # Cyber hover/focus tooltip
+│   │   │   │   ├── Dropdown.jsx         # Accessible popover menu with click-outside dismiss
+│   │   │   │   ├── Tabs.jsx             # Cyber brutalist active underline tab strip
+│   │   │   │   ├── Table.jsx            # Monospace data table with hover row states
+│   │   │   │   └── Skeleton.jsx         # Cyber brutalist pulse skeleton loader
+│   │   │   └── feedback/                # Feedback & boundary components
+│   │   │       ├── ErrorBoundary.jsx    # React error boundary with crash report & retry
+│   │   │       ├── LoadingSpinner.jsx   # Activity spinner with message slot
+│   │   │       ├── EmptyState.jsx       # Terminal-style dashed empty slate
+│   │   │       ├── ErrorState.jsx       # API error slate with retry action
+│   │   │       ├── Toast.jsx            # Toast container & auto-dismiss item alerts
+│   │   │       └── Alert.jsx            # Inline status alert banners
+│   │   ├── features/
+│   │   │   └── ui/
+│   │   │       └── uiSlice.js           # UI state slice (sidebar, drawer, notice, toasts)
+│   │   ├── layouts/
+│   │   │   ├── AppLayout.jsx            # Dashboard shell (Sidebar, TopNav, Mobile Drawer)
+│   │   │   ├── PublicLayout.jsx         # Public shell with header and footer
+│   │   │   ├── AuthLayout.jsx           # Centered authentication shell
+│   │   │   ├── Breadcrumb.jsx           # Monospace breadcrumb navigation trail
+│   │   │   └── PageHeader.jsx           # Standard header with title, badge, and actions
+│   │   ├── lib/
+│   │   │   └── utils.js                 # cn (clsx + twMerge) and UUID generator
+│   │   ├── pages/
+│   │   │   ├── DashboardPage.jsx        # System control dashboard & UI kit showcase
+│   │   │   ├── ProjectsPage.jsx         # Codebase & repositories placeholder shell
+│   │   │   ├── RunsPage.jsx             # Agent runs & LangGraph execution shell
+│   │   │   ├── ApprovalsPage.jsx        # Human-in-the-loop approvals shell
+│   │   │   ├── HistoryPage.jsx          # Immutable audit log shell
+│   │   │   ├── SettingsPage.jsx         # Gateway & workspace configuration shell
+│   │   │   └── NotFoundPage.jsx         # 404 terminal-style error page
+│   │   ├── services/
+│   │   │   ├── api.js                   # Axios client with correlation ID injection
+│   │   │   └── errorHandler.js          # Django error envelope normalization
+│   │   └── styles/
+│   │       └── index.css                # CSS variables, modern <dialog> & brutal scrollbars
+│   └── tests/                           # Vitest component & unit tests
+│       ├── vitest.setup.js              # JSDOM polyfills & setup
+│       ├── test-utils.jsx               # Custom render with Redux and MemoryRouter
+│       ├── api.test.js                  # Axios configuration tests
+│       ├── AppLayout.test.jsx           # Layout rendering and drawer tests
+│       ├── Button.test.jsx              # Button variants, states, and click tests
+│       ├── ErrorBoundary.test.jsx       # Error boundary crash and recovery tests
+│       ├── errorHandler.test.js         # Django error envelope normalization tests
+│       ├── Modal.test.jsx               # HTML5 dialog modal behavior tests
+│       ├── NotFoundPage.test.jsx        # 404 page rendering tests
+│       └── uiSlice.test.js              # Redux UI state reducer tests
 │
 ├── packages/
 │   └── shared/                          # Shared code across services (empty)
@@ -175,6 +235,14 @@ nex - ai software engineer/
 | **Agent Settings** | pydantic-settings | 2.10.1 | Configured |
 | **Cache / Queue** | Redis | 7.4.4-alpine | **Operational & Verified** |
 | **Reverse Proxy** | Nginx | 1.28.0-alpine | **Operational & Verified** |
+| **Frontend UI Library**| React | 18.3.1 | **Operational & Verified** |
+| **Frontend Language** | JavaScript (ES Modules)| ES2022+ (No TS) | **Operational & Verified** |
+| **Frontend Bundler** | Vite | 6.2.0 | **Operational & Verified** |
+| **Frontend Styling** | Tailwind CSS | 3.4.17 | **Operational & Verified** |
+| **Frontend State** | Redux Toolkit | 2.6.0 | **Operational & Verified** |
+| **Frontend Routing** | React Router DOM | 6.29.0 | **Operational & Verified** |
+| **Frontend HTTP Client**| Axios | 1.8.1 | **Operational & Verified** |
+| **Frontend Test Runner**| Vitest + RTL | 3.0.6 / 16.2.0 | **27/27 Tests Passed** |
 | **Python Base Image** | python:3.12.11-slim-bookworm | 3.12.11 | Pinned in both Dockerfiles |
 | **Linter/Formatter** | Ruff | ≥ 0.11, < 1.0 | Configured in pyproject.toml |
 | **Type Checker** | mypy | ≥ 1.15, < 2.0 | Configured in pyproject.toml |
@@ -534,9 +602,61 @@ Frontend / CLI  ──(HTTP/TLS)──>  Nginx Reverse Proxy  ──(Internal)�
 
 ---
 
-## 11. Comprehensive Verification Results (Steps 4, 5A, 6A & 6F)
+## 11. React Web Foundation Architecture (Step 8)
 
-All checks directly verified against running containers:
+### 11.1 Language & Framework Contract
+
+The frontend application in `frontend/` establishes the visual management and control center for NEX:
+- **Strict JavaScript ES Modules:** Pure JavaScript (`.js` and `.jsx`). TypeScript is strictly prohibited (`tsconfig.json` and `@types/*` excluded).
+- **Core Framework:** React 18+ bootstrapped with Vite 6.
+- **Styling Engine:** Tailwind CSS with custom theme extension for Cyber Brutalist tokens.
+- **State Management:** Redux Toolkit (`@reduxjs/toolkit` and `react-redux`) for global UI and application state.
+- **Routing:** React Router DOM v6 with nested layout outlets and error boundary traps.
+- **Form System:** React Hook Form with Zod resolvers.
+
+### 11.2 Cyber Brutalist Visual Identity & Tokens
+
+The design system implements a high-contrast Cyber Brutalist visual language:
+- **Color Tokens:**
+  - Background Primary: `#09090F` (`--color-bg-primary`)
+  - Secondary Background: `#12121C` (`--color-bg-secondary`)
+  - Elevated Surface: `#191927` (`--color-surface-elevated`)
+  - Primary Accent: `#8B5CF6` (`--color-accent-primary`)
+  - Secondary Accent (Cyan): `#00D9FF` (`--color-accent-secondary`)
+  - Highlight Accent: `#C4B5FD` (`--color-accent-highlight`)
+  - Primary Text: `#F5F3FF` (`--color-text-primary`)
+  - Secondary Text: `#A1A1B5` (`--color-text-secondary`)
+  - Structural Border: `#303044` (`--color-border`)
+  - Status Indicators: Success (`#22C55E`), Warning (`#F59E0B`), Danger (`#EF4444`)
+- **Typography Matrix:**
+  - Display / Actions / Headings: `Space Grotesk`
+  - Body Text / Forms: `Inter`
+  - Technical Data / Code / Metrics: `IBM Plex Mono`
+- **Brutalist Shadows & Borders:**
+  - Sharp corners (`rounded-sm` / `rounded-none`), crisp 1.5px structural borders, and offset hard drop shadows (`shadow-brutal-accent`, `shadow-brutal-cyan`, `shadow-brutal`).
+
+### 11.3 Modern Web Standards & Dialog Containment
+
+- **Native `<dialog>` Implementation:** [Modal.jsx](file:///Users/himanshukumar/Developer/GenAi%20Projects/nex%20-%20ai%20software%20engineer/frontend/src/components/ui/Modal.jsx) uses HTML5 native `<dialog>` with `showModal()`, `close()`, native Escape key cancellation, and backdrop click light-dismiss.
+- **Overscroll Containment:** `dialog:modal` and `dialog::backdrop` use `overscroll-behavior: contain` in [index.css](file:///Users/himanshukumar/Developer/GenAi%20Projects/nex%20-%20ai%20software%20engineer/frontend/src/styles/index.css) to stop background scroll leakage without locking `html`/`body` overflow.
+
+### 11.4 API Client & Django Error Envelope Normalization
+
+- **Axios HTTP Client:** [api.js](file:///Users/himanshukumar/Developer/GenAi%20Projects/nex%20-%20ai%20software%20engineer/frontend/src/services/api.js) configures a 15-second default timeout, JSON request/response headers, and automated UUIDv4 correlation ID injection (`X-Correlation-Id`).
+- **Normalized Error Envelope:** [errorHandler.js](file:///Users/himanshukumar/Developer/GenAi%20Projects/nex%20-%20ai%20software%20engineer/frontend/src/services/errorHandler.js) transforms Django backend error envelopes (`{ error: { code, message, detail } }`), network disconnects, timeouts, and HTTP status codes into a predictable structure: `{ code, message, detail, status, isNetworkError, isTimeout }`.
+
+### 11.5 Component & Layout Foundation
+
+- **Cyber Brutalist UI Kit:** `Button`, `Input`, `Textarea`, `Select`, `Checkbox`, `Badge`, `Modal`, `ConfirmDialog`, `Tooltip`, `Dropdown`, `Tabs`, `Table`, `Skeleton`.
+- **Feedback & Boundaries:** `ErrorBoundary` (with crash diagnosis and retry action), `LoadingSpinner`, `EmptyState`, `ErrorState`, `ToastContainer` / `ToastItem`, `Alert`.
+- **Layout Shells:** `AppLayout` (with collapsible sidebar, breadcrumb, mobile drawer, and status header), `PublicLayout`, `AuthLayout`.
+- **Page Views:** `DashboardPage` (system control dashboard and UI kit showcase), `ProjectsPage`, `RunsPage`, `ApprovalsPage`, `HistoryPage`, `SettingsPage`, `NotFoundPage`.
+
+---
+
+## 12. Comprehensive Verification Results (Steps 4, 5A, 6A, 6F & 8)
+
+All checks directly verified against running containers and test suites:
 
 | # | Check | Target | Execution Method | Result | Notes |
 |---|---|---|---|---|---|
@@ -579,10 +699,23 @@ All checks directly verified against running containers:
 | 37| Django Client Correlation Tracing| ContextVar propagation | `test_runtime_client.py` | **PASSED** | Attaches active `X-Correlation-Id` to request headers |
 | 38| Live Container Round-Trip | Django → FastAPI client | Live container execution script | **PASSED** | `ping`, `get_status`, and `verify_task` succeeded; invalid auth rejected |
 | 39| Live Inter-Service Log Tracing| Agent-Runtime structured logs | `docker compose logs agent-runtime` | **PASSED** | Log record tagged with Django's `live-e2e-trace-id-777` |
+| 40| React Frontend Unit Tests | `frontend/tests/` (27 tests) | `npm --prefix frontend test` | **PASSED** | **27/27 tests passed** (8 test files, 1.96s) |
+| 41| React Production Build | `frontend/dist/` assets | `npm --prefix frontend run build` | **PASSED** | Built production bundle in 1.29s (zero errors) |
+| 42| Strict JavaScript Verification| `frontend/` source tree | `find frontend -name "*.ts" -o -name "*.tsx"` | **PASSED** | Zero TypeScript files or configs present |
+| 43| Native Dialog Accessibility | `Modal.jsx` in JSDOM | `tests/Modal.test.jsx` | **PASSED** | Native showModal, backdrop dismiss & escape trap |
+| 44| Error Envelope Normalization | `errorHandler.js` | `tests/errorHandler.test.js` | **PASSED** | Correctly maps Django envelope & network failures |
+| 45| UI State Management | `uiSlice.js` | `tests/uiSlice.test.js` | **PASSED** | Sidebar, drawer, notice & toast reducers verified |
+| 46| UI Component Functionality | `Button.jsx`, `AppLayout.jsx` | `tests/Button.test.jsx`, `AppLayout.test.jsx` | **PASSED** | Variant styling, drawer toggle, and loading states |
 
 ---
 
-## 12. Known Limitations & Remaining Work
+## 13. Known Limitations & Remaining Work
+
+1. **Authentication Classes (Step 5B):** DRF `DEFAULT_AUTHENTICATION_CLASSES` and `DEFAULT_PERMISSION_CLASSES` are prepared and will be activated once the custom user and authentication service are implemented in Step 5B.
+2. **Agent Workflows & Tool Execution (Step 6B+):** LangGraph workflow definitions, prompt execution pipelines, repository analyzers, and disposable sandbox runners will be integrated onto the Step 6A/6F foundation.
+3. **mTLS for Inter-Service Communication:** In high-security multi-host deployments, mutual TLS (mTLS) with short-lived X.509 client certificates can supplement or supersede shared-secret authentication.
+4. **Redis Config Deployment Automation:** While `redis.conf.template` exists and `REDISCLI_AUTH` is used for health checks, automated generation and mounting of `redis.conf` in production environments remains a deployment orchestration task.
+5. **TLS Termination:** Nginx is prepared for TLS reverse proxying, but production SSL certificate provisioning (via Let's Encrypt or Cloud Load Balancer) must be configured prior to public launch.
 
 1. **Authentication Classes (Step 5B):** DRF `DEFAULT_AUTHENTICATION_CLASSES` and `DEFAULT_PERMISSION_CLASSES` are prepared and will be activated once the custom user and authentication service are implemented in Step 5B.
 2. **Agent Workflows & Tool Execution (Step 6B+):** LangGraph workflow definitions, prompt execution pipelines, repository analyzers, and disposable sandbox runners will be integrated onto the Step 6A/6F foundation.
