@@ -1,0 +1,53 @@
+# NEX — Production Redis configuration template
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPLOYMENT INSTRUCTION
+# ─────────────────────────────────────────────────────────────────────────────
+# Docker Compose does not substitute environment variables in mounted config
+# files. Before deploying, generate the final redis.conf from this template:
+#
+#   sed "s/REDIS_PASSWORD_PLACEHOLDER/${REDIS_PASSWORD}/" \
+#       infrastructure/redis/redis.conf.template \
+#       > /run/secrets/redis.conf
+#
+# Then mount /run/secrets/redis.conf into the container read-only.
+# Alternatively, use Docker Swarm or Kubernetes secrets to distribute
+# the generated config file.
+#
+# Using a config file keeps the password out of:
+#   - docker inspect output
+#   - /proc/<pid>/cmdline
+#   - container logs
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Authentication
+# Replace REDIS_PASSWORD_PLACEHOLDER with the actual password before use.
+requirepass REDIS_PASSWORD_PLACEHOLDER
+
+# Persistence — append-only file for durability
+appendonly yes
+appendfsync everysec
+
+# Memory limit (adjust based on available host memory)
+# maxmemory 128mb
+# maxmemory-policy allkeys-lru
+
+# Disable dangerous commands in production
+rename-command FLUSHALL ""
+rename-command FLUSHDB  ""
+rename-command DEBUG    ""
+rename-command CONFIG   ""
+
+# Logging
+loglevel warning
+
+# Network
+bind 0.0.0.0
+protected-mode yes
+
+# Persistence tuning
+save 60 1
+save 300 10
+save 900 1000
+

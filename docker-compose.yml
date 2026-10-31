@@ -1,0 +1,197 @@
+# NEX — Development Docker Compose
+#
+# Starts all services required to run NEX locally.
+# All configuration comes from .env (copy .env.example → .env and fill in values).
+#
+# Usage:
+#   docker compose up -d --build   # build images and start all services
+#   docker compose logs -f         # follow logs
+#   docker compose ps              # service status and health
+#   docker compose down            # stop (volumes preserved)
+#   docker compose down -v         # stop AND destroy volumes  ⚠ data loss
+#
+# Build context is the repository root (".") so that Dockerfiles can
+# COPY from apps/ using paths relative to the repo root.
+# All paths in this file are relative to the repository root (where this file lives).
+
+services:
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # PostgreSQL with pgvector extension
+  # ──────────────────────────────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: nex-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nex}
+      POSTGRES_USER: ${POSTGRES_USER:-nex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nex} -d ${POSTGRES_DB:-nex}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # PostgreSQL is on the internal network only.
+    # No host port is published — accidental public exposure is prevented.
+    # Access interactively: docker compose exec postgres psql -U nex -d nex
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Redis (no password in development)
+  # ──────────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.4.4-alpine
+    container_name: nex-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    # Redis is on the internal network only. No host port published.
+    # Access interactively: docker compose exec redis redis-cli
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Django backend
+  # ──────────────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      # Build context is the repository root so that the Dockerfile can
+      # COPY apps/backend/ using a path relative to the repo root.
+      context: .
+      dockerfile: infrastructure/docker/backend/Dockerfile
+    image: nex-backend:dev
+    container_name: nex-backend
+    restart: unless-stopped
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
+      # DATABASE_URL is constructed from the individual POSTGRES_* variables so
+      # they cannot silently disagree with each other.
+      DATABASE_URL: postgres://${POSTGRES_USER:-nex}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-nex}
+      REDIS_URL: redis://redis:6379/0
+      AGENT_RUNTIME_URL: http://agent-runtime:8001
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-change-me-internal-service-secret-development}
+      INTERNAL_SERVICE_SECRET_FALLBACK: ${INTERNAL_SERVICE_SECRET_FALLBACK:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health/')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # Backend is not published directly to the host.
+    # Access via Nginx on http://localhost:8080
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # FastAPI agent runtime
+  #
+  # Networks:
+  #   internal — to communicate with the Django backend
+  #   egress   — to reach external AI provider APIs (OpenAI, Anthropic, etc.)
+  #
+  # Postgres and Redis remain on the internal network only and are not
+  # reachable via the egress network.
+  # ──────────────────────────────────────────────────────────────────────────
+  agent-runtime:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/agent-runtime/Dockerfile
+    image: nex-agent-runtime:dev
+    container_name: nex-agent-runtime
+    restart: unless-stopped
+    environment:
+      APP_ENV: development
+      APP_DEBUG: "false"
+      BACKEND_URL: http://backend:8000
+      REDIS_URL: redis://redis:6379/1
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-change-me-internal-service-secret-development}
+      INTERNAL_SERVICE_SECRET_FALLBACK: ${INTERNAL_SERVICE_SECRET_FALLBACK:-}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+      - egress
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    # Agent runtime is NOT exposed to the host and NOT proxied by Nginx.
+    # Django backend is the sole external API gateway.
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Nginx reverse proxy
+  # ──────────────────────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.28.0-alpine
+    container_name: nex-nginx
+    restart: unless-stopped
+    volumes:
+      # Path is relative to this file (repo root). Mounted read-only.
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+      - public
+    ports:
+      - "8080:80"    # Development: access at http://localhost:8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/nginx-health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+# ────────────────────────────────────────────────────────────────────────────
+# Named volumes — data persists across container restarts
+# ────────────────────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ────────────────────────────────────────────────────────────────────────────
+# Networks
+#
+# internal — private service-to-service communication
+#             internal: true means NO outbound internet from services on this net
+#             postgres, redis, backend, nginx are on this network
+#
+# egress   — allows agent-runtime outbound internet (AI provider APIs)
+#             Only agent-runtime is on this network
+#             postgres and redis are NOT on this network
+#
+# public   — nginx only; receives traffic from the host
+# ────────────────────────────────────────────────────────────────────────────
+networks:
+  internal:
+    driver: bridge
+    internal: true
+  egress:
+    driver: bridge
+    # internal: false (default) — allows outbound internet for agent-runtime
+  public:
+    driver: bridge

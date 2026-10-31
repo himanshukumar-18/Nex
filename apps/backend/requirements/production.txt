@@ -1,0 +1,5 @@
+# NEX Backend — production requirements
+# Extends base.txt with production-only extras.
+# Development packages are intentionally excluded.
+
+-r base.txt

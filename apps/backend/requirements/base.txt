@@ -1,0 +1,30 @@
+# NEX Backend — base requirements
+# Shared by development and production.
+# Pin to exact versions. Update deliberately: bump version, run full tests.
+# Upgrade path: pip install -U <pkg>, test, commit pin change.
+
+# Web framework
+Django==5.2.3
+
+# REST API
+djangorestframework==3.16.0
+
+# PostgreSQL driver (psycopg v3 — pure-Python binary wheels, no libpq required)
+psycopg[binary]==3.2.9
+
+# Environment variable and settings management
+django-environ==0.12.0
+
+# Static file serving (production, WhiteNoise serves from Gunicorn)
+whitenoise==6.9.0
+
+# Production WSGI application server
+gunicorn==23.0.0
+
+# Redis client for Django (cache backend, rate limiting, session store)
+# Compatible with Redis 7.x. Requires redis-py ≥ 4.0 (pulled as a dependency).
+django-redis==5.4.0
+
+# HTTP client (inter-service communication with FastAPI agent runtime)
+httpx==0.28.1
+

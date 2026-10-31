@@ -1,0 +1,295 @@
+# NEX — Production Docker Compose
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  PRODUCTION PREREQUISITES — read before deploying                        │
+# │                                                                          │
+# │  1. Set ALL required environment variables in the host environment or    │
+# │     a secrets manager. Do NOT use .env files in production.              │
+# │                                                                          │
+# │  Required secrets:                                                        │
+# │    DJANGO_SECRET_KEY       50+ char random string                        │
+# │    POSTGRES_PASSWORD       Strong random password                         │
+# │    DATABASE_URL            postgres://user:pass@postgres:5432/nex         │
+# │    DJANGO_ALLOWED_HOSTS    Comma-separated public hostname(s)             │
+# │    REDIS_PASSWORD          Strong random password                         │
+# │                                                                          │
+# │  2. Configure TLS termination before accepting public traffic.            │
+# │     See infrastructure/nginx/README.md for the TLS deployment checklist. │
+# │     HTTP→HTTPS redirect must be enforced at the load balancer or Nginx.  │
+# │                                                                          │
+# │  3. Generate the Redis config from the template before starting:         │
+# │       sed "s/REDIS_PASSWORD_PLACEHOLDER/${REDIS_PASSWORD}/" \            │
+# │           infrastructure/redis/redis.conf.template > /run/redis.conf     │
+# │     Then update the Redis volume mount path below.                       │
+# │                                                                          │
+# │  4. Build images from pinned Dockerfiles:                                 │
+# │       docker compose -f docker-compose.prod.yml build                   │
+# │                                                                          │
+# │  5. This file does NOT bake any secret into images.                      │
+# │     Secrets are injected at runtime only.                                │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.prod.yml logs -f
+#   docker compose -f docker-compose.prod.yml ps
+#
+# All paths are relative to the repository root (where this file lives).
+
+services:
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # PostgreSQL with pgvector
+  # ──────────────────────────────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: nex-postgres-prod
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nex}
+      POSTGRES_USER: ${POSTGRES_USER:-nex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nex} -d ${POSTGRES_DB:-nex}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+    # No host port published. Only accessible on the internal network.
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Redis (password-protected in production)
+  #
+  # Password approach:
+  #   The Redis password is passed via --requirepass in the command.
+  #   This is visible in `docker inspect` and /proc/<pid>/cmdline.
+  #   For stronger isolation, generate a redis.conf from the template at
+  #   infrastructure/redis/redis.conf.template and mount it read-only instead.
+  #   See the prerequisites block above.
+  #
+  #   The health check uses REDISCLI_AUTH env var (read automatically by
+  #   redis-cli) so the password does not appear in the health check command.
+  # ──────────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.4.4-alpine
+    container_name: nex-redis-prod
+    restart: always
+    command:
+      - redis-server
+      - "--save"
+      - "60"
+      - "1"
+      - "--loglevel"
+      - "warning"
+      - "--requirepass"
+      - "${REDIS_PASSWORD:?REDIS_PASSWORD is required in production}"
+    environment:
+      # redis-cli reads REDISCLI_AUTH automatically — keeps password out of
+      # the health check command line and container inspect arguments.
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?}
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+    healthcheck:
+      # Uses REDISCLI_AUTH env var — no password in command arguments.
+      test: ["CMD", "redis-cli", "--no-auth-warning", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # No host port published.
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Django backend
+  # ──────────────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      # Build context is the repository root so the Dockerfile can
+      # COPY apps/backend/ relative to the repo root.
+      context: .
+      dockerfile: infrastructure/docker/backend/Dockerfile
+    image: nex-backend:prod
+    container_name: nex-backend-prod
+    restart: always
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      # Required — production.py exits with a clear error if missing or insecure.
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?DJANGO_ALLOWED_HOSTS is required}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379/0
+      AGENT_RUNTIME_URL: http://agent-runtime:8001
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?INTERNAL_SERVICE_SECRET is required}
+      INTERNAL_SERVICE_SECRET_FALLBACK: ${INTERNAL_SERVICE_SECRET_FALLBACK:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health/')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      # Gunicorn worker temp files and Django staticfiles (populated at startup).
+      - /tmp:size=64m,mode=1777
+      - /app/staticfiles:size=32m
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512m
+        reservations:
+          cpus: "0.25"
+          memory: 128m
+    # No host port. Only reachable via Nginx on the internal network.
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # FastAPI agent runtime (internal + egress)
+  #
+  # Networks:
+  #   internal — communicate with Django backend
+  #   egress   — outbound internet for AI provider APIs (OpenAI, Anthropic, etc.)
+  #
+  # Postgres and Redis are NOT on the egress network.
+  # Agent runtime is NOT proxied by Nginx and not on the public network.
+  # ──────────────────────────────────────────────────────────────────────────
+  agent-runtime:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/agent-runtime/Dockerfile
+    image: nex-agent-runtime:prod
+    container_name: nex-agent-runtime-prod
+    restart: always
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      BACKEND_URL: http://backend:8000
+      REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379/1
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?INTERNAL_SERVICE_SECRET is required}
+      INTERNAL_SERVICE_SECRET_FALLBACK: ${INTERNAL_SERVICE_SECRET_FALLBACK:-}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+      - egress
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512m
+        reservations:
+          cpus: "0.25"
+          memory: 128m
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Nginx — sole publicly reachable service
+  # ──────────────────────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.28.0-alpine
+    container_name: nex-nginx-prod
+    restart: always
+    volumes:
+      # Path relative to repo root. Mounted read-only.
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+      - public
+    ports:
+      # In production, place a TLS-terminating load balancer in front.
+      # Port 80 is exposed here for the LB → Nginx leg (HTTP internally).
+      # Direct public internet exposure on port 80 without TLS is not acceptable.
+      - "80:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/nginx-health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE   # Required to bind port 80 as non-root
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 64m
+        reservations:
+          cpus: "0.1"
+          memory: 32m
+
+# ────────────────────────────────────────────────────────────────────────────
+# Volumes
+# ────────────────────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ────────────────────────────────────────────────────────────────────────────
+# Networks
+#
+# internal — private bridge with internal: true (no outbound internet)
+#             postgres, redis, backend, agent-runtime (internal leg), nginx
+#
+# egress   — standard bridge (internet allowed) for agent-runtime AI calls only
+#             postgres and redis are NOT on this network
+#
+# public   — standard bridge for host → nginx traffic
+# ────────────────────────────────────────────────────────────────────────────
+networks:
+  internal:
+    driver: bridge
+    internal: true
+  egress:
+    driver: bridge
+  public:
+    driver: bridge
