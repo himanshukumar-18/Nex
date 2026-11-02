@@ -33,6 +33,7 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 # ---------------------------------------------------------------------------
 
 DJANGO_APPS = [
+    "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.staticfiles",
     "django.contrib.postgres",
@@ -40,18 +41,24 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     "rest_framework",
+    "corsheaders",
 ]
 
 LOCAL_APPS: list[str] = [
     "apps.core",
     "apps.api",
+    "apps.accounts",
+    "apps.audit_logs",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
+AUTH_USER_MODEL = "accounts.User"
+
 MIDDLEWARE = [
     # Correlation ID must be first so all downstream handlers can access it.
     "apps.api.middleware.CorrelationIdMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -285,10 +292,13 @@ REST_FRAMEWORK: dict = {
         "apps.api.throttling.AnonymousRateThrottle",
         "apps.api.throttling.AuthenticatedRateThrottle",
     ],
-    # Permission and authentication — configured in Step 5B.
-    # Explicitly listed here as reminder anchors; do not remove.
-    "DEFAULT_AUTHENTICATION_CLASSES": [],   # Step 5B: add JWT + session auth
-    "DEFAULT_PERMISSION_CLASSES": [],       # Step 5B: add IsAuthenticatedUser
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "apps.accounts.authentication.FirebaseAuthentication",
+        "apps.accounts.authentication.CliTokenAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "apps.api.permissions.IsAuthenticatedUser",
+    ],
 }
 
 # ---------------------------------------------------------------------------
@@ -304,5 +314,61 @@ AGENT_RUNTIME_CONNECT_TIMEOUT: float = 3.0
 AGENT_RUNTIME_READ_TIMEOUT: float = 15.0
 AGENT_RUNTIME_WRITE_TIMEOUT: float = 10.0
 AGENT_RUNTIME_POOL_TIMEOUT: float = 5.0
+
+# ---------------------------------------------------------------------------
+# Firebase Authentication & Identity Provider Configuration
+# ---------------------------------------------------------------------------
+
+FIREBASE_PROJECT_ID: str = env("FIREBASE_PROJECT_ID", default="")
+FIREBASE_CREDENTIALS_PATH: str = env("FIREBASE_CREDENTIALS_PATH", default="")
+FIREBASE_CREDENTIALS_JSON: str = env("FIREBASE_CREDENTIALS_JSON", default="")
+
+# ---------------------------------------------------------------------------
+# Cross-Origin Resource Sharing (CORS) Configuration
+# ---------------------------------------------------------------------------
+
+CORS_ALLOWED_ORIGINS: list[str] = env.list(
+    "CORS_ALLOWED_ORIGINS",
+    default=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://0.0.0.0:3000",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "http://0.0.0.0:8080",
+    ],
+)
+
+CORS_ALLOW_CREDENTIALS: bool = True
+
+CORS_ALLOW_METHODS: list[str] = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+]
+
+CORS_ALLOW_HEADERS: list[str] = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+    "x-correlation-id",
+]
+
+CORS_EXPOSE_HEADERS: list[str] = [
+    "x-correlation-id",
+]
+
+CORS_PREFLIGHT_MAX_AGE: int = 86400
+
+
 
 

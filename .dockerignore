@@ -5,6 +5,10 @@
 .env.*
 !.env.example
 
+secrets/
+*.pem
+*.key
+
 .venv
 venv
 __pycache__

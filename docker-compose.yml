@@ -84,6 +84,12 @@ services:
       AGENT_RUNTIME_URL: http://agent-runtime:8001
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-change-me-internal-service-secret-development}
       INTERNAL_SERVICE_SECRET_FALLBACK: ${INTERNAL_SERVICE_SECRET_FALLBACK:-}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-nex---ai-software-engineer}
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-/run/secrets/firebase-service-account.json}
+      FIREBASE_CREDENTIALS_JSON: ${FIREBASE_CREDENTIALS_JSON:-}
+    volumes:
+      - ./apps/backend:/app
+      - ./secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -91,6 +97,7 @@ services:
         condition: service_healthy
     networks:
       - internal
+      - egress
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health/')\""]
       interval: 15s
@@ -163,6 +170,40 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # React frontend (development with Vite HMR)
+  # ──────────────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/frontend/Dockerfile
+      target: development
+    image: nex-frontend:dev
+    container_name: nex-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      VITE_BACKEND_PROXY_TARGET: http://backend:8000
+    volumes:
+      # Bind-mount frontend source code for live hot module replacement (HMR)
+      - ./frontend:/app
+      # Anonymous volume preserves container-installed node_modules
+      - /app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+      - public
+    ports:
+      - "3000:3000"    # Development: access UI at http://localhost:3000
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
 # ────────────────────────────────────────────────────────────────────────────
 # Named volumes — data persists across container restarts

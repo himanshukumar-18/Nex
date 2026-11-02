@@ -139,6 +139,11 @@ services:
       AGENT_RUNTIME_URL: http://agent-runtime:8001
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?INTERNAL_SERVICE_SECRET is required}
       INTERNAL_SERVICE_SECRET_FALLBACK: ${INTERNAL_SERVICE_SECRET_FALLBACK:-}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-/run/secrets/firebase-service-account.json}
+      FIREBASE_CREDENTIALS_JSON: ${FIREBASE_CREDENTIALS_JSON:-}
+    volumes:
+      - ./secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -146,6 +151,7 @@ services:
         condition: service_healthy
     networks:
       - internal
+      - egress
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health/')\""]
       interval: 15s
@@ -261,6 +267,47 @@ services:
         limits:
           cpus: "0.5"
           memory: 64m
+        reservations:
+          cpus: "0.1"
+          memory: 32m
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # React frontend (production SPA on hardened Nginx)
+  # ──────────────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/frontend/Dockerfile
+      target: production
+    image: nex-frontend:prod
+    container_name: nex-frontend-prod
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+      - public
+    ports:
+      - "3000:80"    # Production UI served on port 3000
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128m
         reservations:
           cpus: "0.1"
           memory: 32m

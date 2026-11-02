@@ -1,6 +1,9 @@
 import React from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import AppLayout from '@/layouts/AppLayout';
+import AuthLayout from '@/layouts/AuthLayout';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+
 import DashboardPage from '@/pages/DashboardPage';
 import ProjectsPage from '@/pages/ProjectsPage';
 import RunsPage from '@/pages/RunsPage';
@@ -9,10 +12,47 @@ import HistoryPage from '@/pages/HistoryPage';
 import SettingsPage from '@/pages/SettingsPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 
+import LoginPage from '@/pages/auth/LoginPage';
+import RegisterPage from '@/pages/auth/RegisterPage';
+import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage';
+import CliAuthConsentPage from '@/pages/auth/CliAuthConsentPage';
+
 export const router = createBrowserRouter([
+  // Public & CLI Auth Routes
+  {
+    element: <AuthLayout />,
+    errorElement: <NotFoundPage />,
+    children: [
+      {
+        path: '/login',
+        element: <LoginPage />,
+      },
+      {
+        path: '/register',
+        element: <RegisterPage />,
+      },
+      {
+        path: '/forgot-password',
+        element: <ForgotPasswordPage />,
+      },
+      {
+        path: '/auth/cli',
+        element: (
+          <ProtectedRoute>
+            <CliAuthConsentPage />
+          </ProtectedRoute>
+        ),
+      },
+    ],
+  },
+  // Protected Application Dashboard Routes
   {
     path: '/',
-    element: <AppLayout />,
+    element: (
+      <ProtectedRoute>
+        <AppLayout />
+      </ProtectedRoute>
+    ),
     errorElement: <NotFoundPage />,
     children: [
       {
@@ -48,4 +88,3 @@ export const router = createBrowserRouter([
 ]);
 
 export default router;
-

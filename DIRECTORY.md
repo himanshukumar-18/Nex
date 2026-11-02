@@ -1,6 +1,12 @@
 # NEX — Repository Directory
 
-> **Status: Step 8 React Frontend Foundation Implemented & Verified** — Production-grade React web foundation established with strict JavaScript (ES Modules, zero TypeScript), Cyber Brutalist visual identity, and modern web standards. Features centralized Redux Toolkit state management (`uiSlice` with persistent drawer preferences and toast system), Axios HTTP client with automated `X-Correlation-Id` propagation and Django error envelope normalization (`errorHandler.js`), HTML5 native `<dialog>` modals with `overscroll-behavior: contain` and light dismiss, responsive application layouts (`AppLayout`, `PublicLayout`, `AuthLayout`), comprehensive Cyber Brutalist component kit (Buttons, Inputs, Selects, Checkboxes, Badges, Tabs, Tables, Skeletons, ErrorBoundary, EmptyState, ErrorState, Alerts, Toasts), and full page shells (`DashboardPage`, `ProjectsPage`, `RunsPage`, `ApprovalsPage`, `HistoryPage`, `SettingsPage`, `NotFoundPage`). Combined platform automated tests: **167/167 passing tests** (106 Django backend + 34 FastAPI agent-runtime + 27 React frontend). Production build tested and verified via Vite. All 5 Docker development services healthy.
+> **Status: Step 10 Production-Grade Authentication & Identity Security Implemented & Verified** — Complete unified authentication and identity management system implemented using Firebase Authentication across the React Web Application (`frontend/`), Django REST Backend (`apps/backend/`), and Python CLI (`cli/nex/`). Follows the platform philosophy: **Understand → Plan → Build → Verify → Ship**.
+> - **Unified Identity Architecture**: Firebase Authentication provides identity provider capabilities (Google Sign-In, GitHub Sign-In, Email/Password, Email Verification, Password Reset). Django acts as the authoritative boundary for local user profiles, RBAC roles (`member`, `developer`, `admin`), active sessions, and security audit log events.
+> - **GitHub OAuth & Account Linking**: Built-in multi-provider account conflict resolution with `AccountLinkingModal.jsx` and atomic Postgres user provisioning. Handles missing/private GitHub emails with deterministic fallbacks (`github_<uid>@users.nex.local`) and enforces verified email linking before merging accounts.
+> - **CLI Browser-Based PKCE OAuth 2.0**: RFC 7636 (S256 code challenge) and RFC 8252 (ephemeral loopback receiver) authorization code flow allowing seamless terminal authentication without credentials ever touching plaintext TOML or config files. Single-use code burning prevents replay attacks.
+> - **Secure Credential Storage**: Python CLI securely saves session tokens via OS Keyring (macOS Keychain, Linux Secret Service, Windows Credential Manager) with an encrypted 0600 file store fallback.
+> - **Lifecycle State Machine & Single-Flight Synchronization**: 6-stage frontend lifecycle (`initializing` → `unauthenticated` → `firebase_authenticated` → `synchronizing_profile` → `authenticated` → `error`), single-flight `/auth/me/` request locking to eliminate "login-twice" and CORS preflight issues, and idempotent backend logout (`LogoutView`).
+> - **Comprehensive Security Controls**: Defense-in-depth authorization (`IsAuthenticatedUser`, `IsDeveloperOrAdmin`, `IsAdminRole`, `IsEmailVerified`), immutable audit event logging (`SecurityAuditEvent`), fail-closed throttles, and automated test coverage across all 4 tiers: **315/315 passing automated tests** (139 Django backend + 34 FastAPI agent-runtime + 83 React frontend + 59 Python CLI). All Docker services operational and healthy.
 
 ---
 
@@ -70,9 +76,28 @@ nex - ai software engineer/
 │   │       │       ├── test_pagination.py
 │   │       │       ├── test_runtime_client.py # Inter-service communication & reliability test suite (11 tests)
 │   │       │       └── test_throttling.py
-│   │       ├── accounts/                # User and organisation management (empty placeholder)
+│   │       ├── accounts/                # User identity, roles, and CLI PKCE authentication
+│   │       │   ├── __init__.py
+│   │       │   ├── apps.py              # AppConfig (apps.accounts)
+│   │       │   ├── authentication.py    # FirebaseAuthentication and CliTokenAuthentication
+│   │       │   ├── models.py            # User (AbstractBaseUser), CliAuthorizationCode, CliSession
+│   │       │   ├── permissions.py       # IsDeveloperOrAdmin, IsAdminRole, IsEmailVerified
+│   │       │   ├── serializers.py       # Serializers for UserProfile, CliAuthorize, CliTokenExchange
+│   │       │   ├── urls.py              # /api/v1/auth/ routing (me, sync, logout, cli/*)
+│   │       │   ├── views.py             # MeView, SyncProfileView, CliAuthorizeView, CliTokenExchangeView, etc.
+│   │       │   ├── services/
+│   │       │   │   ├── __init__.py
+│   │       │   │   └── firebase.py      # FirebaseAdminService (verify_id_token, revoke_refresh_tokens)
+│   │       │   ├── migrations/
+│   │       │   │   └── 0001_initial.py  # User, CliAuthorizationCode, CliSession database migrations
+│   │       │   └── tests/               # Accounts and CLI flow test suite (28 tests)
 │   │       ├── agent_runs/              # Agent execution records (empty placeholder)
-│   │       ├── audit_logs/              # Security and activity audit trail (empty placeholder)
+│   │       ├── audit_logs/              # Security and activity audit trail
+│   │       │   ├── __init__.py
+│   │       │   ├── apps.py              # AppConfig (apps.audit_logs)
+│   │       │   ├── models.py            # SecurityAuditEvent immutable event model & factory
+│   │       │   └── migrations/
+│   │       │       └── 0001_initial.py  # SecurityAuditEvent migration
 │   │       ├── projects/                # Project management (empty placeholder)
 │   │       └── repositories/            # Git repository integration (empty placeholder)
 │   │
@@ -114,14 +139,51 @@ nex - ai software engineer/
 │           └── test_service_auth.py     # Shared-secret verification & rotation fallback tests (6 tests)
 │
 ├── cli/
-│   └── nex/                             # NEX CLI (scaffolded, not implemented)
+│   ├── nex/                             # NEX CLI application package
+│   │   ├── __init__.py                  # Package metadata & version (0.1.0)
+│   │   ├── main.py                      # NexTyper application & argument hoisting entry point
+│   │   ├── client/                      # Backend API communication
+│   │   │   ├── __init__.py
+│   │   │   ├── contracts.py             # Pydantic models for backend contracts
+│   │   │   ├── django.py                # Synchronous httpx client for Django API gateway
+│   │   │   └── exceptions.py            # Typed client transport exceptions
+│   │   ├── commands/                    # Command implementations
+│   │   │   ├── __init__.py              # Command exports
+│   │   │   ├── init.py                  # nex init (.nex/config.toml scaffolding)
+│   │   │   ├── inspect.py               # nex inspect (working tree, languages, manifests)
+│   │   │   ├── review.py                # nex review (--staged diff inspection)
+│   │   │   ├── fix.py                   # nex fix (issue fix plan & HIGH-risk approval)
+│   │   │   ├── test.py                  # nex test (hybrid sandbox policy verification)
+│   │   │   ├── security.py              # nex security (sensitive file & credential scan)
+│   │   │   ├── pr.py                    # nex pr (CRITICAL-risk approval & PR publishing)
+│   │   │   ├── config.py                # nex config (show, path, get, set with secret masking)
+│   │   │   └── runs.py                  # nex runs (historical run inspection via backend)
+│   │   ├── config/                      # Configuration management
+│   │   │   ├── __init__.py
+│   │   │   ├── loader.py                # Layered config loader & TOML serialization
+│   │   │   ├── paths.py                 # User & project config path resolution
+│   │   │   └── schema.py                # Pydantic configuration schema
+│   │   ├── core/                        # Core execution & safety boundaries
+│   │   │   ├── __init__.py
+│   │   │   ├── approvals.py             # ApprovalPolicy & RiskLevel (LOW, MEDIUM, HIGH, CRITICAL)
+│   │   │   ├── context.py               # CLIContext aggregate
+│   │   │   ├── exceptions.py            # Domain exceptions with exit code mappings
+│   │   │   ├── execution_policy.py      # ExecutionPolicy (LOCAL vs REMOTE_SANDBOX)
+│   │   │   ├── exit_codes.py            # POSIX ExitCode constants (0 to 8)
+│   │   │   └── repository.py            # GitStatus, path traversal defense, sensitive file scan
+│   │   └── output/                      # Terminal & JSON presentation
+│   │       ├── __init__.py
+│   │       ├── json.py                  # Machine-readable JSON output on stdout
+│   │       └── terminal.py              # Rich Cyber Brutalist formatting with design tokens
+│   └── tests/                           # CLI automated test suite (47 tests)
 │       ├── __init__.py
-│       ├── main.py
-│       ├── client/
-│       ├── commands/
-│       ├── config/
-│       └── ui/
-│   └── tests/
+│       ├── test_approvals_and_policy.py # ApprovalPolicy, RiskLevel, and ExecutionPolicy tests (7 tests)
+│       ├── test_cli_commands.py         # End-to-end command integration tests (16 tests)
+│       ├── test_client.py               # HTTP client retries, timeouts, and headers (6 tests)
+│       ├── test_config.py               # Layer precedence, secret redaction, schema (5 tests)
+│       ├── test_exit_codes_and_exceptions.py # Domain exceptions and POSIX exit codes (3 tests)
+│       ├── test_output.py               # Terminal & JSON formatting tests (3 tests)
+│       └── test_repository.py           # Path traversal, sensitive files, summary tests (7 tests)
 │
 ├── frontend/                            # React web application (Step 8 Foundation)
 │   ├── index.html                       # HTML entry point with Cyber Brutalist fonts
@@ -138,6 +200,9 @@ nex - ai software engineer/
 │   │   │   ├── router.jsx               # React Router DOM route definitions
 │   │   │   └── providers.jsx            # Provider composition (Redux + ErrorBoundary)
 │   │   ├── components/
+│   │   │   ├── auth/                    # Authentication guards & dialogs
+│   │   │   │   ├── AccountLinkingModal.jsx # Multi-provider identity conflict & credential linking modal
+│   │   │   │   └── ProtectedRoute.jsx   # Route guard with auth & role check
 │   │   │   ├── ui/                      # Cyber Brutalist UI Kit
 │   │   │   │   ├── Button.jsx           # Variants (primary, secondary, outline, danger, cyan)
 │   │   │   │   ├── Input.jsx            # Form input with icon, error, and monospace styling
@@ -159,7 +224,11 @@ nex - ai software engineer/
 │   │   │       ├── ErrorState.jsx       # API error slate with retry action
 │   │   │       ├── Toast.jsx            # Toast container & auto-dismiss item alerts
 │   │   │       └── Alert.jsx            # Inline status alert banners
+│   │   ├── config/
+│   │   │   └── env.js                   # Validated Vite environment configuration & safe diagnostics
 │   │   ├── features/
+│   │   │   ├── auth/
+│   │   │   │   └── authSlice.js         # Redux auth state slice (user, token, role, emailVerified)
 │   │   │   └── ui/
 │   │   │       └── uiSlice.js           # UI state slice (sidebar, drawer, notice, toasts)
 │   │   ├── layouts/
@@ -171,6 +240,11 @@ nex - ai software engineer/
 │   │   ├── lib/
 │   │   │   └── utils.js                 # cn (clsx + twMerge) and UUID generator
 │   │   ├── pages/
+│   │   │   ├── auth/
+│   │   │   │   ├── LoginPage.jsx        # Email/password and OAuth (Google, GitHub) login
+│   │   │   │   ├── RegisterPage.jsx     # Registration with email verification flow
+│   │   │   │   ├── ForgotPasswordPage.jsx # Password reset email request
+│   │   │   │   └── CliAuthConsentPage.jsx # CLI OAuth PKCE approval & callback consent
 │   │   │   ├── DashboardPage.jsx        # System control dashboard & UI kit showcase
 │   │   │   ├── ProjectsPage.jsx         # Codebase & repositories placeholder shell
 │   │   │   ├── RunsPage.jsx             # Agent runs & LangGraph execution shell
@@ -179,21 +253,33 @@ nex - ai software engineer/
 │   │   │   ├── SettingsPage.jsx         # Gateway & workspace configuration shell
 │   │   │   └── NotFoundPage.jsx         # 404 terminal-style error page
 │   │   ├── services/
-│   │   │   ├── api.js                   # Axios client with correlation ID injection
-│   │   │   └── errorHandler.js          # Django error envelope normalization
+│   │   │   ├── index.js                 # Centralized services export
+│   │   │   ├── api.js                   # Axios client with correlation ID & token refresh
+│   │   │   ├── authApi.js               # Dedicated authentication and CLI API endpoints
+│   │   │   ├── systemApi.js             # Liveness and readiness system health probes
+│   │   │   ├── firebase.js              # Firebase SDK singleton and auth helper methods
+│   │   │   └── errorHandler.js          # Django error envelope normalization (DRF + status)
 │   │   └── styles/
 │   │       └── index.css                # CSS variables, modern <dialog> & brutal scrollbars
-│   └── tests/                           # Vitest component & unit tests
+│   └── tests/                           # Vitest component & unit tests (83 tests)
 │       ├── vitest.setup.js              # JSDOM polyfills & setup
 │       ├── test-utils.jsx               # Custom render with Redux and MemoryRouter
-│       ├── api.test.js                  # Axios configuration tests
-│       ├── AppLayout.test.jsx           # Layout rendering and drawer tests
-│       ├── Button.test.jsx              # Button variants, states, and click tests
-│       ├── ErrorBoundary.test.jsx       # Error boundary crash and recovery tests
-│       ├── errorHandler.test.js         # Django error envelope normalization tests
-│       ├── Modal.test.jsx               # HTML5 dialog modal behavior tests
-│       ├── NotFoundPage.test.jsx        # 404 page rendering tests
-│       └── uiSlice.test.js              # Redux UI state reducer tests
+│       ├── AccountLinkingModal.test.jsx # Account linking & credential merge flow tests (7 tests)
+│       ├── api.test.js                  # Axios configuration, interceptor & retry tests (9 tests)
+│       ├── authApi.test.js              # Dedicated authApi endpoint & sync tests (10 tests)
+│       ├── systemApi.test.js            # System health probe tests (2 tests)
+│       ├── env.test.js                  # Environment diagnostics tests (2 tests)
+│       ├── firebase.test.js             # Firebase auth methods & error mapping tests (9 tests)
+│       ├── authSlice.test.js            # Redux authSlice reducer & lifecycle tests (8 tests)
+│       ├── AppLayout.test.jsx           # Layout rendering and drawer tests (4 tests)
+│       ├── Button.test.jsx              # Button variants, states, and click tests (5 tests)
+│       ├── CliAuthConsentPage.test.jsx  # CLI PKCE consent page tests (3 tests)
+│       ├── ErrorBoundary.test.jsx       # Error boundary crash and recovery tests (3 tests)
+│       ├── errorHandler.test.js         # Django error envelope normalization tests (8 tests)
+│       ├── Modal.test.jsx               # HTML5 dialog modal behavior tests (2 tests)
+│       ├── NotFoundPage.test.jsx        # 404 page rendering tests (1 test)
+│       ├── ProtectedRoute.test.jsx      # Route guard & redirection tests (5 tests)
+│       └── uiSlice.test.js              # Redux UI state reducer tests (5 tests)
 │
 ├── packages/
 │   └── shared/                          # Shared code across services (empty)
@@ -205,7 +291,9 @@ nex - ai software engineer/
 │   │   ├── agent-runtime/
 │   │   │   └── Dockerfile               # Multi-stage FastAPI agent-runtime image
 │   │   ├── cli/                         # CLI Dockerfile (not yet needed)
-│   │   └── frontend/                    # Frontend Dockerfile (not yet needed)
+│   │   └── frontend/
+│   │       ├── Dockerfile               # Multi-stage React frontend image (deps, dev, build, prod)
+│   │       └── nginx.conf               # Hardened SPA Nginx configuration for production runtime
 │   ├── nginx/
 │   │   ├── nginx.conf                   # Nginx reverse-proxy configuration
 │   │   └── README.md                    # Production TLS deployment checklist
@@ -654,7 +742,84 @@ The design system implements a high-contrast Cyber Brutalist visual language:
 
 ---
 
-## 12. Comprehensive Verification Results (Steps 4, 5A, 6A, 6F & 8)
+## 12. Python Command-Line Interface (CLI) Foundation (Step 9)
+
+### 12.1 Command-First Design & Architecture
+
+The NEX CLI is a production-grade developer control center built in Python 3.12+ using **Typer**, **Rich**, **HTTPX**, and **Pydantic**. Packaged standardly via `pyproject.toml` (`[project.scripts] nex = "nex.main:app"`), it exposes a command-first terminal interface adhering to the core philosophy:
+
+$$\text{Understand} \longrightarrow \text{Plan} \longrightarrow \text{Build} \longrightarrow \text{Verify} \longrightarrow \text{Ship}$$
+
+Key architectural features:
+- **Argument Hoisting (`NexTyper`):** Automatically normalizes global options (`--json`, `--verbose`, `--yes`, `--no-color`, `--path`) regardless of whether placed before or after subcommands (e.g. `nex inspect --json` vs `nex --json inspect`).
+- **Eager Version Callback:** Fast `--version` / `-V` handling with dual support for rich Cyber Brutalist branding or machine-readable JSON.
+- **Dual Presentation Layers:** Pure Cyber Brutalist terminal formatting via Rich (`TerminalOutput`) and machine-readable JSON output on `stdout` (`print_json_success`, `print_json_error`) with diagnostics strictly isolated to `stderr`.
+
+### 12.2 Command Catalog
+
+| Command | Signature | Risk Level | Description |
+|---|---|---|---|
+| `nex init` | `nex init [-n name] [-f]` | `MEDIUM` | Scaffolds `.nex/config.toml` project configuration; prompts on overwrite unless `--force`. |
+| `nex inspect` | `nex inspect [-s]` | `LOW` | Inspects working tree, active branch, languages, manifests, and file count without modifying files. |
+| `nex review` | `nex review [-s/--staged]` | `LOW` | Inspects staged or working tree diffs and prepares review payloads for the agent review engine. |
+| `nex fix` | `nex fix <issue> [-d/--dry-run]` | `HIGH` | Analyzes issues and prepares patch plans. Enforces interactive approval; `--yes` is forbidden. |
+| `nex test` | `nex test [-l/--local] [-t target]` | `HIGH` (local) | Verifies test suites using hybrid execution policy (isolated sandbox default; local requires consent). |
+| `nex security` | `nex security [-s/--strict]` | `LOW` | Scans workspace for exposed secrets (`.env*`, `*.pem`, `*.key`, `id_rsa*`) and loose permissions. |
+| `nex pr` | `nex pr [-t title] [-b body] [-d]` | `CRITICAL` | Prepares and publishes pull requests. Enforces strict interactive consent; `--yes` is forbidden. |
+| `nex config` | `nex config [show/path/get/set]` | `LOW`/`MEDIUM` | Inspects and safely mutates project or user configuration with recursive secret masking. |
+| `nex runs` | `nex runs [list/get <id>]` | `LOW` | Queries historical agent runs and execution logs from the Django backend API gateway. |
+
+### 12.3 Developer Approval Policy & Safety Controls
+
+- **Four Risk Tiers:** `RiskLevel.LOW`, `RiskLevel.MEDIUM`, `RiskLevel.HIGH`, and `RiskLevel.CRITICAL`.
+- **Strict `--yes` Restrictions:** The `--yes` flag is **strictly forbidden** from bypassing developer consent on `HIGH` (code modifications, test execution) and `CRITICAL` (git push, PR creation) risk operations. Passing `--yes` immediately raises `NexPolicyViolationError` (Exit code 7).
+- **Non-Interactive Terminal Defense:** Interactive prompts check `sys.stdin.isatty()`. In automated CI/CD or non-TTY environments without dry-run, operations safely halt with `NexApprovalRequiredError` (Exit code 6).
+- **Hybrid Execution Policy:** Untrusted or AI-generated commands are barred from local host execution by `ExecutionPolicy` and must be routed to isolated containerized sandboxes. Dangerous shell strings (`rm -rf`, `sudo`, `chmod`, `curl | sh`) are blocked locally.
+
+### 12.4 POSIX Exit Code Contract
+
+All CLI operations terminate with predictable, standardized POSIX exit codes:
+
+| Exit Code | Name | Meaning |
+|---|---|---|
+| `0` | `SUCCESS` | Operation completed successfully |
+| `1` | `GENERAL_ERROR` | Unhandled failure or unexpected error |
+| `2` | `INVALID_INPUT` | Invalid user arguments, unknown flags, or malformed input |
+| `3` | `CONFIG_ERROR` | Missing configuration, invalid TOML, or schema violation |
+| `4` | `AUTH_ERROR` | Authentication failed, invalid API key, or unauthorized |
+| `5` | `BACKEND_UNAVAILABLE` | Backend unreachable, connection timeout, or gateway down |
+| `6` | `APPROVAL_REQUIRED` | Action requires interactive consent or was rejected |
+| `7` | `POLICY_VIOLATION` | Safety boundary violation, directory traversal, or disallowed `--yes` bypass |
+| `8` | `VERIFICATION_FAILED` | Test suite execution or verification check failure |
+
+### 12.5 Layered Configuration & Secret Redaction
+
+Configuration is parsed and merged across 5 distinct layers in strict precedence:
+1. Explicit CLI options & flags
+2. Environment variables (`NEX_API_URL`, `NEX_DEFAULT_MODEL`, `NEX_VERBOSE`, `NEX_REQUIRE_APPROVAL`)
+3. Project configuration (`<repo>/.nex/config.toml` or `nex.toml`)
+4. User global configuration (`~/.nex/config.toml`)
+5. Default schema values (`NexConfig` Pydantic model)
+
+- **Recursive Secret Masking:** `redact_secrets()` masks all keys containing `api_key`, `secret`, `token`, `password`, `credential`, or `private_key` (e.g. `***7890`) before rendering to terminal or JSON output.
+- **Secure File Permissions:** Configuration files are written with owner-only permissions (`0o600`) and recursive `None`-stripping to ensure clean TOML serialization.
+
+### 12.6 Django API Gateway Client & Boundary
+
+- **Synchronous HTTP Client:** [NexDjangoClient](file:///Users/himanshukumar/Developer/GenAi%20Projects/nex%20-%20ai%20software%20engineer/cli/nex/client/django.py) communicates strictly with the Django public API gateway (`http://localhost:8080/api/v1` or `http://localhost:8000/api/v1`). It never bypasses the gateway to call internal FastAPI ports (`8001`).
+- **Health Probe Host Routing:** Probes targeting `/health/` automatically strip `/api/v1` to hit the infrastructure liveness endpoint at root level.
+- **Explicit Timeout Matrix:** 5.0s connect timeout, 15.0s read timeout, 10.0s write timeout, 5.0s pool timeout.
+- **Idempotent Retry Policy:** GET and HEAD requests automatically retry up to `retry_attempts` on transient connection disconnects. Non-idempotent methods (POST, PUT, DELETE, PATCH) never retry automatically.
+- **Correlation ID Tracking:** Every request automatically injects an `X-Correlation-Id` header for cross-service observability.
+
+### 12.7 Local Repository Discovery & Path Traversal Defense
+
+- **Safe Path Resolution:** `resolve_within_repository()` verifies that all target paths resolve strictly within the repository workspace boundary, rejecting `../` directory traversal attempts with `NexPolicyViolationError`.
+- **Sensitive File Exclusion:** File scanners (`collect_repository_summary`, `scan_sensitive_files`) filter out `.git`, `.venv`, and `node_modules`, and flag patterns matching credentials, private keys, or `.env*` files.
+
+---
+
+## 13. Comprehensive Verification Results (Steps 4, 5A, 6A, 6F, 8 & 9)
 
 All checks directly verified against running containers and test suites:
 
@@ -699,17 +864,33 @@ All checks directly verified against running containers and test suites:
 | 37| Django Client Correlation Tracing| ContextVar propagation | `test_runtime_client.py` | **PASSED** | Attaches active `X-Correlation-Id` to request headers |
 | 38| Live Container Round-Trip | Django → FastAPI client | Live container execution script | **PASSED** | `ping`, `get_status`, and `verify_task` succeeded; invalid auth rejected |
 | 39| Live Inter-Service Log Tracing| Agent-Runtime structured logs | `docker compose logs agent-runtime` | **PASSED** | Log record tagged with Django's `live-e2e-trace-id-777` |
-| 40| React Frontend Unit Tests | `frontend/tests/` (27 tests) | `npm --prefix frontend test` | **PASSED** | **27/27 tests passed** (8 test files, 1.96s) |
-| 41| React Production Build | `frontend/dist/` assets | `npm --prefix frontend run build` | **PASSED** | Built production bundle in 1.29s (zero errors) |
+| 40| React Frontend Unit Tests | `frontend/tests/` (83 tests) | `npm --prefix frontend test` | **PASSED** | **83/83 tests passed** (16 test files, 2.95s) |
+| 41| React Production Build | `frontend/dist/` assets | `npm --prefix frontend run build` | **PASSED** | Built production bundle in 1.84s (zero errors) |
 | 42| Strict JavaScript Verification| `frontend/` source tree | `find frontend -name "*.ts" -o -name "*.tsx"` | **PASSED** | Zero TypeScript files or configs present |
 | 43| Native Dialog Accessibility | `Modal.jsx` in JSDOM | `tests/Modal.test.jsx` | **PASSED** | Native showModal, backdrop dismiss & escape trap |
 | 44| Error Envelope Normalization | `errorHandler.js` | `tests/errorHandler.test.js` | **PASSED** | Correctly maps Django envelope & network failures |
 | 45| UI State Management | `uiSlice.js` | `tests/uiSlice.test.js` | **PASSED** | Sidebar, drawer, notice & toast reducers verified |
 | 46| UI Component Functionality | `Button.jsx`, `AppLayout.jsx` | `tests/Button.test.jsx`, `AppLayout.test.jsx` | **PASSED** | Variant styling, drawer toggle, and loading states |
+| 47| Frontend Dockerfile Multi-Stage| `infrastructure/docker/frontend/` | `docker build` (deps, dev, builder, prod) | **PASSED** | Verified all 4 stages build cleanly with layer caching |
+| 48| Frontend Dev Container (HMR)  | `nex-frontend:dev` | `docker compose up -d frontend` | **PASSED** | Vite HMR server on port 3000, unprivileged `uid=1000(node)` |
+| 49| Frontend Prod Container (SPA) | `nex-frontend:prod` | `docker run -p 3001:80 nex-frontend:prod` | **PASSED** | Hardened Nginx 1.28 (22.1 MB), unprivileged `uid=101(nginx)` |
+| 50| Frontend Container Healthchecks| `nex-frontend` | `docker inspect --format '{{.State.Health.Status}}'` | **PASSED** | Dev `/` and Prod `/health` return HTTP 200 `{"status":"ok"}` |
+| 51| Frontend Compose Integration  | `docker-compose.yml` & prod | `docker compose config --quiet` | **PASSED** | Valid syntax, volume caching, security opts & health checks |
+| 52| 6-Service Docker Stack Health | All 6 services | `docker compose ps` | **PASSED** | All 6 services report `(healthy)` |
+| 53| CLI Entry Point & Help Screen | `nex --help` | `nex --help` | **PASSED** | Displays Cyber Brutalist commands and global options |
+| 54| CLI Version & JSON Formatting | `nex --version --json` | `nex --version --json` | **PASSED** | Emits machine-readable JSON envelope on stdout |
+| 55| High-Risk Approval Enforcement | `nex fix` with `--yes` | `nex fix "Bug" --yes` | **PASSED** | Enforces Exit code 7 (`POLICY_VIOLATION`); blocks `--yes` |
+| 56| Critical-Risk PR Approval     | `nex pr` with `--yes` | `nex pr --yes` | **PASSED** | Enforces Exit code 7 (`POLICY_VIOLATION`); blocks `--yes` |
+| 57| Sensitive File & Secret Audit | `nex security` | `nex security` | **PASSED** | Identifies `.env*`, keys, and loose permissions |
+| 58| Safe Config Mutation & Masking| `nex config show/get/set` | `nex config get/set` | **PASSED** | Redacts sensitive secrets; enforces 0o600 permissions |
+| 59| CLI Code Quality & Typing     | `ruff`, `mypy` | `ruff check/format`, `mypy cli/` | **PASSED** | 0 lint errors, 37 formatted files, 0 typing issues |
+| 60| CLI Automated Pytest Suite    | `cli/tests/` (59 tests) | `pytest cli/tests/` | **PASSED** | **59/59 tests passed** (8 test files, 2.09s) |
+| 61| Django Backend Test Suite     | `apps/backend/` (139 tests) | `python manage.py test` | **PASSED** | **139/139 tests passed** (all apps, 0.49s) |
+| 62| Agent Runtime Pytest Suite    | `apps/agent-runtime/` (34 tests) | `pytest` | **PASSED** | **34/34 tests passed** (8 test modules, 0.11s) |
 
 ---
 
-## 13. Known Limitations & Remaining Work
+## 14. Known Limitations & Remaining Work
 
 1. **Authentication Classes (Step 5B):** DRF `DEFAULT_AUTHENTICATION_CLASSES` and `DEFAULT_PERMISSION_CLASSES` are prepared and will be activated once the custom user and authentication service are implemented in Step 5B.
 2. **Agent Workflows & Tool Execution (Step 6B+):** LangGraph workflow definitions, prompt execution pipelines, repository analyzers, and disposable sandbox runners will be integrated onto the Step 6A/6F foundation.
@@ -717,12 +898,6 @@ All checks directly verified against running containers and test suites:
 4. **Redis Config Deployment Automation:** While `redis.conf.template` exists and `REDISCLI_AUTH` is used for health checks, automated generation and mounting of `redis.conf` in production environments remains a deployment orchestration task.
 5. **TLS Termination:** Nginx is prepared for TLS reverse proxying, but production SSL certificate provisioning (via Let's Encrypt or Cloud Load Balancer) must be configured prior to public launch.
 
-1. **Authentication Classes (Step 5B):** DRF `DEFAULT_AUTHENTICATION_CLASSES` and `DEFAULT_PERMISSION_CLASSES` are prepared and will be activated once the custom user and authentication service are implemented in Step 5B.
-2. **Agent Workflows & Tool Execution (Step 6B+):** LangGraph workflow definitions, prompt execution pipelines, repository analyzers, and disposable sandbox runners will be integrated onto the Step 6A/6F foundation.
-3. **mTLS for Inter-Service Communication:** In high-security multi-host deployments, mutual TLS (mTLS) with short-lived X.509 client certificates can supplement or supersede shared-secret authentication.
-4. **Redis Config Deployment Automation:** While `redis.conf.template` exists and `REDISCLI_AUTH` is used for health checks, automated generation and mounting of `redis.conf` in production environments remains a deployment orchestration task.
-5. **TLS Termination:** Nginx is prepared for TLS reverse proxying, but production SSL certificate provisioning (via Let's Encrypt or Cloud Load Balancer) must be configured prior to public launch.
-
 ---
 
-*Last updated: 2026-10-31*
+*Last updated: 2026-11-01*

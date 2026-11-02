@@ -40,6 +40,8 @@ Note: Object-level permissions must be enforced by calling
 Never rely solely on queryset filtering.
 """
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from rest_framework.permissions import SAFE_METHODS, BasePermission

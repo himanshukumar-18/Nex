@@ -2,7 +2,7 @@
 
 NEX is a proprietary, full-stack AI software engineering platform that helps developers understand, modify, test, review, and ship code through intelligent automation.
 
-> **Project status: Step 8 React Frontend Foundation Implemented & Verified.** React 18+ web management interface established with strict JavaScript (ES Modules, zero TypeScript), distinctive Cyber Brutalist visual identity, modern web standards (native `<dialog>` modals with overscroll containment), centralized Redux Toolkit state management (`uiSlice`), Axios client with correlation ID propagation and Django error envelope normalization (`errorHandler.js`), responsive layouts (`AppLayout`, `PublicLayout`, `AuthLayout`), and a 27-test automated component/unit suite (all passing). Combined platform automated test coverage: **167/167 verified tests passing** (106 Django backend + 34 FastAPI agent-runtime + 27 React frontend). PostgreSQL 17 with `pgvector` (v0.8.7) and Redis 7.4 are operational across all 5 healthy Docker services.
+> **Project status: Step 10 Production-Grade Authentication & Identity Security Implemented & Verified.** Unified identity system powered by Firebase Authentication across the React Web Application, Django REST Backend, and Python CLI. Features Google and GitHub OAuth, Email/Password, Email Verification, Password Reset, Django RBAC roles (`member`, `developer`, `admin`), immutable security audit logging (`SecurityAuditEvent`), RFC 7636 / RFC 8252 PKCE browser-based authorization code flow for the CLI, and secure OS Keyring credential storage with encrypted file fallback. Combined platform automated test coverage: **315/315 verified tests passing** (139 Django backend + 34 FastAPI agent-runtime + 83 React frontend + 59 Python CLI). All Docker services operational and healthy.
 
 ---
 
@@ -60,7 +60,7 @@ NEX is a proprietary, full-stack AI software engineering platform that helps dev
 - **Abstract Base Models**: All future models inherit from `apps.core.models.BaseModel` (UUIDv4 primary keys and automated timestamp auditing).
 - **Distributed Rate Limiting**: Redis-backed sliding-window counter using atomic Lua scripts (O(1) memory, privacy-masked client identifiers, configurable fail-open policy).
 - **Centralized Exception Handling & Tracing**: All API errors conform to a unified JSON envelope (`error`, `message`, `detail`), and every request is tracked across workers with a UUID4 `X-Correlation-Id`.
-- **Automated Test Coverage**: **167 verified tests passing across the stack** (106 Django backend tests + 34 FastAPI agent-runtime tests + 27 React frontend tests), plus live inter-container integration verified.
+- **Automated Test Coverage**: **315 verified tests passing across the stack** (139 Django backend tests + 34 FastAPI agent-runtime tests + 83 React frontend tests + 59 Python CLI tests), plus live inter-container integration verified.
 
 See [DIRECTORY.md](DIRECTORY.md) for detailed architecture, security decisions, and verification records.
 
@@ -105,10 +105,11 @@ docker compose exec backend python manage.py migrate
 ### 4. Verify service health and readiness
 
 ```bash
-docker compose ps                               # all 5 should report (healthy)
-curl http://localhost:8080/health/              # Liveness probe  → {"status":"ok"}
-curl http://localhost:8080/health/ready/        # Readiness probe → {"status":"ready","database":"connected"}
-curl http://localhost:8080/nginx-health         # Nginx probe     → {"status":"ok"}
+docker compose ps                               # all 6 services should report (healthy)
+curl http://localhost:8080/health/              # Backend liveness probe   → {"status":"ok"}
+curl http://localhost:8080/health/ready/        # Backend readiness probe  → {"status":"ready","database":"connected"}
+curl http://localhost:8080/nginx-health         # Nginx proxy probe        → {"status":"ok"}
+curl http://localhost:3000/                     # Frontend UI probe        → HTTP 200 (HTML)
 ```
 
 ---
@@ -133,6 +134,64 @@ npm run build
 
 # Preview production build locally
 npm run preview
+```
+
+---
+
+## Command-Line Interface (CLI) Commands
+
+The `nex` executable is installed via standard Python packaging (`pyproject.toml`):
+
+```bash
+# View all available CLI commands and global options
+./.venv/bin/nex --help
+
+# Display CLI version (supports both terminal and machine-readable JSON)
+./.venv/bin/nex --version
+./.venv/bin/nex --version --json
+
+# Initialize a project configuration (.nex/config.toml)
+./.venv/bin/nex init
+
+# Inspect local repository structure, detected languages, manifests, and Git status
+./.venv/bin/nex inspect
+./.venv/bin/nex inspect --json
+
+# Review working tree or staged code changes
+./.venv/bin/nex review
+./.venv/bin/nex review --staged
+
+# Plan targeted issue fixes with dry-run preview (HIGH risk requires interactive approval)
+./.venv/bin/nex fix "Fix memory leak in auth middleware" --dry-run
+./.venv/bin/nex fix "Fix memory leak in auth middleware"
+
+# Run tests under hybrid sandbox execution policy
+./.venv/bin/nex test
+./.venv/bin/nex test --local
+
+# Scan workspace for exposed credentials, private keys, and loose permissions
+./.venv/bin/nex security
+./.venv/bin/nex security --strict
+
+# Prepare and submit pull requests (CRITICAL risk requires interactive approval)
+./.venv/bin/nex pr --title "Fix authentication token issue" --draft
+
+# Inspect and safely mutate configuration settings (secrets automatically masked)
+./.venv/bin/nex config show
+./.venv/bin/nex config path
+./.venv/bin/nex config get general.default_model
+./.venv/bin/nex config set general.default_model "gemini-2.0-flash"
+
+# Inspect historical agent execution runs from Django backend
+./.venv/bin/nex runs list
+./.venv/bin/nex runs get <run-uuid>
+
+# Run CLI automated unit and integration test suite (47 tests)
+./.venv/bin/pytest cli/tests/
+
+# Run CLI linting and type checking
+./.venv/bin/ruff check cli/
+./.venv/bin/mypy cli/
 ```
 
 ---
@@ -198,10 +257,10 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps backend python mana
 ```
 apps/backend/       Django REST API service (Core foundation, abstract models, AgentRuntimeClient, health probes)
 apps/agent-runtime/ FastAPI agent runtime (Internal AI execution, service auth, Redis DB 1, dynamic 413 limits)
-cli/                NEX command-line interface (scaffolded)
-frontend/           React web application (scaffolded)
+cli/                NEX command-line interface (Typer, Rich, HTTPX, Pydantic, POSIX exit codes)
+frontend/           React web application (Cyber Brutalist, Redux Toolkit, containerized)
 packages/           Shared library code
-infrastructure/     Dockerfiles, Nginx reverse proxy, and Redis config template
+infrastructure/     Dockerfiles (backend, agent-runtime, frontend), Nginx proxy, Redis template
 scripts/            Development automation scripts
 tests/              Cross-service test suites
 ```

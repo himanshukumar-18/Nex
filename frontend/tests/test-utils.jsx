@@ -4,6 +4,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter } from 'react-router-dom';
 import uiReducer from '@/features/ui/uiSlice';
+import authReducer from '@/features/auth/authSlice';
 
 /**
  * Creates a fresh Redux store instance for isolated testing.
@@ -12,6 +13,7 @@ export function createTestStore(preloadedState = {}) {
   return configureStore({
     reducer: {
       ui: uiReducer,
+      auth: authReducer,
     },
     preloadedState,
     middleware: (getDefaultMiddleware) =>

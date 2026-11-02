@@ -1,8 +1,38 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeApiError, ERROR_CODES } from '@/services/errorHandler';
+import {
+  normalizeApiError,
+  ERROR_CODES,
+  getDefaultCodeForStatus,
+  getDefaultMessageForStatus,
+} from '@/services/errorHandler';
 
 describe('errorHandler - normalizeApiError', () => {
-  it('normalizes Django Core Backend standard error envelope', () => {
+  it('normalizes Django backend string error envelope: { error: "authentication_required", message: "...", detail: null }', () => {
+    const backendError = {
+      response: {
+        status: 401,
+        data: {
+          error: 'authentication_required',
+          message: 'Authentication credentials are required.',
+          detail: null,
+        },
+      },
+    };
+
+    const normalized = normalizeApiError(backendError);
+
+    expect(normalized).toEqual({
+      __normalized: true,
+      code: ERROR_CODES.AUTHENTICATION_ERROR,
+      message: 'Authentication credentials are required.',
+      detail: null,
+      status: 401,
+      isNetworkError: false,
+      isTimeout: false,
+    });
+  });
+
+  it('normalizes Django Core Backend standard object error envelope', () => {
     const backendError = {
       response: {
         status: 400,
@@ -40,6 +70,7 @@ describe('errorHandler - normalizeApiError', () => {
 
     expect(normalized.code).toBe(ERROR_CODES.NETWORK_ERROR);
     expect(normalized.isNetworkError).toBe(true);
+    expect(normalized.isTimeout).toBe(false);
     expect(normalized.status).toBeNull();
   });
 
@@ -53,39 +84,45 @@ describe('errorHandler - normalizeApiError', () => {
 
     expect(normalized.code).toBe(ERROR_CODES.TIMEOUT);
     expect(normalized.isTimeout).toBe(true);
+    expect(normalized.isNetworkError).toBe(false);
     expect(normalized.status).toBe(408);
   });
 
-  it('provides sensible default error codes and messages for standard HTTP status codes', () => {
-    const error404 = {
-      response: {
-        status: 404,
-        data: {},
-      },
-    };
-    const norm404 = normalizeApiError(error404);
-    expect(norm404.code).toBe(ERROR_CODES.NOT_FOUND);
-    expect(norm404.status).toBe(404);
+  it('maps HTTP status codes to correct default error codes and messages', () => {
+    const testCases = [
+      { status: 400, code: ERROR_CODES.BAD_REQUEST },
+      { status: 401, code: ERROR_CODES.AUTHENTICATION_ERROR },
+      { status: 403, code: ERROR_CODES.PERMISSION_DENIED },
+      { status: 404, code: ERROR_CODES.NOT_FOUND },
+      { status: 409, code: ERROR_CODES.CONFLICT },
+      { status: 422, code: ERROR_CODES.VALIDATION_ERROR },
+      { status: 429, code: ERROR_CODES.RATE_LIMITED },
+      { status: 500, code: ERROR_CODES.SERVER_ERROR },
+      { status: 502, code: ERROR_CODES.BAD_GATEWAY },
+      { status: 503, code: ERROR_CODES.SERVICE_UNAVAILABLE },
+      { status: 504, code: ERROR_CODES.GATEWAY_TIMEOUT },
+    ];
 
-    const error429 = {
-      response: {
-        status: 429,
-        data: {},
-      },
-    };
-    const norm429 = normalizeApiError(error429);
-    expect(norm429.code).toBe(ERROR_CODES.RATE_LIMITED);
-    expect(norm429.status).toBe(429);
+    testCases.forEach(({ status, code }) => {
+      expect(getDefaultCodeForStatus(status)).toBe(code);
+      const normalized = normalizeApiError({ response: { status, data: {} } });
+      expect(normalized.code).toBe(code);
+      expect(normalized.status).toBe(status);
+      expect(typeof getDefaultMessageForStatus(status)).toBe('string');
+    });
+  });
 
-    const error500 = {
+  it('extracts top-level detail string when data.detail is present', () => {
+    const error = {
       response: {
-        status: 500,
-        data: {},
+        status: 403,
+        data: { detail: 'CSRF Failed: CSRF token missing.' },
       },
     };
-    const norm500 = normalizeApiError(error500);
-    expect(norm500.code).toBe(ERROR_CODES.SERVER_ERROR);
-    expect(norm500.status).toBe(500);
+
+    const normalized = normalizeApiError(error);
+    expect(normalized.code).toBe(ERROR_CODES.PERMISSION_DENIED);
+    expect(normalized.message).toBe('CSRF Failed: CSRF token missing.');
   });
 
   it('returns already normalized error without re-wrapping', () => {
@@ -102,5 +139,13 @@ describe('errorHandler - normalizeApiError', () => {
     const normalized = normalizeApiError(initial);
     expect(normalized).toBe(initial);
   });
-});
 
+  it('normalizes generic client JavaScript error', () => {
+    const generic = new Error('Client computation failed');
+    const normalized = normalizeApiError(generic);
+
+    expect(normalized.code).toBe(ERROR_CODES.UNKNOWN_ERROR);
+    expect(normalized.message).toBe('Client computation failed');
+    expect(normalized.status).toBeNull();
+  });
+});

@@ -28,3 +28,9 @@ django-redis==5.4.0
 # HTTP client (inter-service communication with FastAPI agent runtime)
 httpx==0.28.1
 
+# Firebase Admin SDK for server-side ID token verification
+firebase-admin==6.6.0
+
+# Cross-Origin Resource Sharing (CORS) headers for React frontend
+django-cors-headers==4.7.0
+

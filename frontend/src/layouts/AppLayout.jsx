@@ -21,10 +21,14 @@ import {
   Terminal,
   Activity,
   Bell,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ToastContainer from '@/components/feedback/Toast';
 import Alert from '@/components/feedback/Alert';
+import { selectCurrentUser, clearCredentials } from '@/features/auth/authSlice';
+import { logoutFirebase } from '@/services/firebase';
+import { authApi } from '@/services/authApi';
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', to: '/', icon: LayoutDashboard },
@@ -41,6 +45,18 @@ export function AppLayout() {
   const { sidebarCollapsed, mobileMenuOpen, systemNotice } = useAppSelector(
     (state) => state.ui
   );
+  const user = useAppSelector(selectCurrentUser);
+
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // Backend error ignored on logout
+    } finally {
+      await logoutFirebase();
+      dispatch(clearCredentials());
+    }
+  };
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary flex flex-col font-sans antialiased selection:bg-accent-primary selection:text-white">
@@ -89,6 +105,22 @@ export function AppLayout() {
             <Bell className="w-4 h-4" />
             <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-accent-secondary" />
           </button>
+
+          {user && (
+            <div className="flex items-center gap-2 pl-2 border-l border-border">
+              <span className="hidden sm:inline-block text-[11px] text-text-secondary font-mono truncate max-w-[120px]">
+                {user.displayName || user.email}
+              </span>
+              <button
+                type="button"
+                onClick={handleLogout}
+                title="Sign out"
+                className="text-text-secondary hover:text-status-danger p-1.5 rounded hover:bg-surface-elevated transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </header>
 

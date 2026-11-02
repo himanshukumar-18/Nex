@@ -11,13 +11,11 @@ URL naming convention:
   name      = "<resource>-<action>"   e.g. "projects-list", "repositories-detail"
 """
 
-from django.urls import path
+from django.urls import include, path
 
 app_name = "api_v1"
 
 urlpatterns: list = [
-    # Domain endpoint groups are added here as applications are implemented.
-    # Example (Step 5B — accounts):
-    #   path("accounts/", include("apps.accounts.urls", namespace="accounts")),
+    path("auth/", include("apps.accounts.urls", namespace="accounts")),
 ]
 
