@@ -30,6 +30,38 @@ class SecurityAuditEvent(BaseModel):
             "password_reset_requested",
             "Password Reset Requested",
         )
+        GITHUB_INSTALLATION_INITIATED = (
+            "github_installation_initiated",
+            "GitHub Installation Initiated",
+        )
+        GITHUB_INSTALLATION_COMPLETED = (
+            "github_installation_completed",
+            "GitHub Installation Completed",
+        )
+        GITHUB_INSTALLATION_DISCONNECTED = (
+            "github_installation_disconnected",
+            "GitHub Installation Disconnected",
+        )
+        GITHUB_WEBHOOK_RECEIVED = (
+            "github_webhook_received",
+            "GitHub Webhook Received",
+        )
+        GITHUB_TOKEN_GENERATED = (
+            "github_token_generated",
+            "GitHub Token Generated",
+        )
+        GITHUB_REPOSITORIES_SYNCED = (
+            "github_repositories_synced",
+            "GitHub Repositories Synced",
+        )
+        GITHUB_PULL_REQUEST_CREATED = (
+            "github_pull_request_created",
+            "GitHub Pull Request Created",
+        )
+        GITHUB_PULL_REQUEST_SYNCED = (
+            "github_pull_request_synced",
+            "GitHub Pull Request Synced",
+        )
 
     event_type = models.CharField(
         max_length=64,

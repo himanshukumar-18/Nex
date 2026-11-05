@@ -1,6 +1,7 @@
 """NEX CLI — Tests for Authentication, Keyring Storage, and PKCE Flow."""
 
 import json
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -38,7 +39,7 @@ runner = NexCliRunner()
 
 @pytest.fixture(autouse=True)
 def clean_credentials_vault(
-    tmp_path: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Ensure a clean, isolated credential store for each test."""
     fake_fallback_dir = tmp_path / ".nex"

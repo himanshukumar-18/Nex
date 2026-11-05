@@ -17,5 +17,6 @@ app_name = "api_v1"
 
 urlpatterns: list = [
     path("auth/", include("apps.accounts.urls", namespace="accounts")),
+    path("repositories/", include("apps.repositories.urls", namespace="repositories")),
 ]
 

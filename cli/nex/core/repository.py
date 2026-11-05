@@ -29,6 +29,9 @@ SENSITIVE_PATTERNS: tuple[str, ...] = (
     "*.secret",
     "credentials.json",
     "service_account*.json",
+    "service-account*.json",
+    "*service_account*.json",
+    "*service-account*.json",
 )
 
 IGNORED_DIRECTORIES: set[str] = {

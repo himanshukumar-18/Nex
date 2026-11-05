@@ -22,6 +22,10 @@ export default defineConfig({
         target: process.env.VITE_BACKEND_PROXY_TARGET || 'http://localhost:8080',
         changeOrigin: true,
       },
+      '/health': {
+        target: process.env.VITE_BACKEND_PROXY_TARGET || 'http://localhost:8080',
+        changeOrigin: true,
+      },
     },
   },
   test: {

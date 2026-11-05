@@ -1,12 +1,13 @@
 # NEX — Repository Directory
 
-> **Status: Step 10 Production-Grade Authentication & Identity Security Implemented & Verified** — Complete unified authentication and identity management system implemented using Firebase Authentication across the React Web Application (`frontend/`), Django REST Backend (`apps/backend/`), and Python CLI (`cli/nex/`). Follows the platform philosophy: **Understand → Plan → Build → Verify → Ship**.
-> - **Unified Identity Architecture**: Firebase Authentication provides identity provider capabilities (Google Sign-In, GitHub Sign-In, Email/Password, Email Verification, Password Reset). Django acts as the authoritative boundary for local user profiles, RBAC roles (`member`, `developer`, `admin`), active sessions, and security audit log events.
-> - **GitHub OAuth & Account Linking**: Built-in multi-provider account conflict resolution with `AccountLinkingModal.jsx` and atomic Postgres user provisioning. Handles missing/private GitHub emails with deterministic fallbacks (`github_<uid>@users.nex.local`) and enforces verified email linking before merging accounts.
-> - **CLI Browser-Based PKCE OAuth 2.0**: RFC 7636 (S256 code challenge) and RFC 8252 (ephemeral loopback receiver) authorization code flow allowing seamless terminal authentication without credentials ever touching plaintext TOML or config files. Single-use code burning prevents replay attacks.
-> - **Secure Credential Storage**: Python CLI securely saves session tokens via OS Keyring (macOS Keychain, Linux Secret Service, Windows Credential Manager) with an encrypted 0600 file store fallback.
-> - **Lifecycle State Machine & Single-Flight Synchronization**: 6-stage frontend lifecycle (`initializing` → `unauthenticated` → `firebase_authenticated` → `synchronizing_profile` → `authenticated` → `error`), single-flight `/auth/me/` request locking to eliminate "login-twice" and CORS preflight issues, and idempotent backend logout (`LogoutView`).
-> - **Comprehensive Security Controls**: Defense-in-depth authorization (`IsAuthenticatedUser`, `IsDeveloperOrAdmin`, `IsAdminRole`, `IsEmailVerified`), immutable audit event logging (`SecurityAuditEvent`), fail-closed throttles, and automated test coverage across all 4 tiers: **315/315 passing automated tests** (139 Django backend + 34 FastAPI agent-runtime + 83 React frontend + 59 Python CLI). All Docker services operational and healthy.
+> **Status: Step 11 Completed & Frontend Fully Integrated** — Complete production-grade GitHub App authorization, repository synchronization, safe Git operations, Pull Request lifecycle automation, and end-to-end React frontend integration implemented and verified across Django REST Backend (`apps/backend/apps/repositories/`), React Frontend (`frontend/src/pages/`), and Python CLI (`nex *`). Follows the platform philosophy: **Understand → Plan → Build → Verify → Ship**.
+> - **Unified Identity & Authorization Separation**: Firebase Authentication provides identity provider capabilities (Google, GitHub, Email/Password login). GitHub repository authorization is handled via a dedicated GitHub App flow, completely decoupled from Firebase user identity.
+> - **Local Git Foundation (Step 11 Phase 1)**: Safe subprocess argument execution (`subprocess.run(["git", ...])`, `shell=False`), robust working tree status, branch tracking, commit history, sensitive file/token redaction in diffs, detached HEAD / shallow clone / merge / rebase state detection (`nex git *`).
+> - **GitHub App Authorization & Token Security (Step 11 Phase 2)**: Cryptographic state token generation with atomic single-use burn (anti-replay/CSRF), RS256 GitHub App JWT generation, short-lived installation access tokens cached in Redis, object-level cross-user isolation, and constant-time HMAC-SHA256 webhook signature verification.
+> - **GitHub Repository Integration (Step 11 Phase 3)**: Safe paginated repository discovery, idempotent database upserts into PostgreSQL `Repository` model, non-destructive tombstoning (`is_active=False, sync_status="removed"`), webhook lifecycle ingestion (`installation_repositories`, `repository`), versioned REST API (`/api/v1/repositories/`), full-featured React dashboard with metrics/filters/detail drawer, and CLI command suite (`nex repos list`, `nex repos sync`, `nex repos show`).
+> - **Safe Git Operations & Pull Requests (Step 11 Phase 4 & 5)**: Explicit file staging, commit author attribution, push authentication via ephemeral short-lived GitHub App tokens, preview fingerprint validation, pre-PR automated checks, and full PR publish workflow (`nex pr`).
+> - **End-to-End React Frontend Integration**: All primary application pages (`DashboardPage`, `ProjectsPage`, `ApprovalsPage`, `HistoryPage`, `SettingsPage`, `RunsPage`) wired to live Django API endpoints, featuring Cyber Brutalist design, skeleton loaders, and zero TypeScript files.
+> - **Automated Test Coverage**: **490/490 passing automated tests** (195 Django backend + 34 FastAPI agent-runtime + 125 React frontend + 136 Python CLI). All Docker services operational and healthy.
 
 ---
 
@@ -97,9 +98,28 @@ nex - ai software engineer/
 │   │       │   ├── apps.py              # AppConfig (apps.audit_logs)
 │   │       │   ├── models.py            # SecurityAuditEvent immutable event model & factory
 │   │       │   └── migrations/
-│   │       │       └── 0001_initial.py  # SecurityAuditEvent migration
+│   │       │       ├── 0001_initial.py  # SecurityAuditEvent initial migration
+│   │       │       ├── 0002_alter_securityauditevent_event_type.py # Added GITHUB_REPOSITORIES_SYNCED
+│   │       │       └── 0003_alter_securityauditevent_event_type.py # Added GITHUB_PULL_REQUEST_CREATED & SYNCED
 │   │       ├── projects/                # Project management (empty placeholder)
-│   │       └── repositories/            # Git repository integration (empty placeholder)
+│   │       └── repositories/            # Git & GitHub App integration (Step 11)
+│   │           ├── __init__.py
+│   │           ├── apps.py              # AppConfig (apps.repositories)
+│   │           ├── models.py            # GitHubInstallation, GitHubWebhookEvent, Repository, GitOperation, PullRequest
+│   │           ├── serializers.py       # Serializers for status, init, installations, repositories, sync, operations, push tokens, pull requests
+│   │           ├── urls.py              # /api/v1/repositories/ routing (repos, sync, status, install, callback, installations, webhook, operations, push-token, pulls)
+│   │           ├── views.py             # RepositoryListView, Detail, Sync, Status, GitHubStatusView, Install, Callback, Disconnect, Webhook, Operations, PushToken, PullRequests
+│   │           ├── services/
+│   │           │   ├── __init__.py
+│   │           │   ├── github_app.py    # GitHubAppService (JWT RS256, token cache, webhook HMAC)
+│   │           │   ├── pull_request.py  # PullRequestService (preview fingerprinting, PR creation, live status sync)
+│   │           │   └── sync.py          # RepositorySyncService (paginated discovery, upserts, tombstoning)
+│   │           ├── migrations/
+│   │           │   ├── 0001_initial.py  # GitHubInstallation & GitHubWebhookEvent initial migration
+│   │           │   ├── 0002_repository.py # Repository model migration
+│   │           │   ├── 0003_gitoperation.py # GitOperation model migration (Phase 4)
+│   │           │   └── 0004_pullrequest.py # PullRequest model migration (Phase 5)
+│   │           └── tests/               # Repository, GitHub App, Callback resilience & PR test suite
 │   │
 │   └── agent-runtime/                   # FastAPI AI agent service
 │       ├── requirements.txt             # Pinned Python dependencies (FastAPI, Redis, Uvicorn, httpx, pytest)
@@ -149,15 +169,18 @@ nex - ai software engineer/
 │   │   │   └── exceptions.py            # Typed client transport exceptions
 │   │   ├── commands/                    # Command implementations
 │   │   │   ├── __init__.py              # Command exports
+│   │   │   ├── auth.py                  # nex auth (login, logout, whoami, github status/connect)
+│   │   │   ├── config.py                # nex config (show, path, get, set with secret masking)
+│   │   │   ├── fix.py                   # nex fix (issue fix plan & HIGH-risk approval)
+│   │   │   ├── git.py                   # nex git (status, branches, log, diff, remotes, inspect, branch create/switch, stage, unstage, staged, commit, push)
 │   │   │   ├── init.py                  # nex init (.nex/config.toml scaffolding)
 │   │   │   ├── inspect.py               # nex inspect (working tree, languages, manifests)
+│   │   │   ├── pr.py                    # nex pr (CRITICAL-risk approval, PR comparison preview, publish, list, view)
+│   │   │   ├── repos.py                 # nex repos (list, sync, show synchronized repositories)
 │   │   │   ├── review.py                # nex review (--staged diff inspection)
-│   │   │   ├── fix.py                   # nex fix (issue fix plan & HIGH-risk approval)
-│   │   │   ├── test.py                  # nex test (hybrid sandbox policy verification)
+│   │   │   ├── runs.py                  # nex runs (historical run inspection via backend)
 │   │   │   ├── security.py              # nex security (sensitive file & credential scan)
-│   │   │   ├── pr.py                    # nex pr (CRITICAL-risk approval & PR publishing)
-│   │   │   ├── config.py                # nex config (show, path, get, set with secret masking)
-│   │   │   └── runs.py                  # nex runs (historical run inspection via backend)
+│   │   │   └── test.py                  # nex test (hybrid sandbox policy verification)
 │   │   ├── config/                      # Configuration management
 │   │   │   ├── __init__.py
 │   │   │   ├── loader.py                # Layered config loader & TOML serialization
@@ -167,28 +190,36 @@ nex - ai software engineer/
 │   │   │   ├── __init__.py
 │   │   │   ├── approvals.py             # ApprovalPolicy & RiskLevel (LOW, MEDIUM, HIGH, CRITICAL)
 │   │   │   ├── context.py               # CLIContext aggregate
+│   │   │   ├── credentials.py           # OS Keyring & encrypted fallback vault
 │   │   │   ├── exceptions.py            # Domain exceptions with exit code mappings
 │   │   │   ├── execution_policy.py      # ExecutionPolicy (LOCAL vs REMOTE_SANDBOX)
 │   │   │   ├── exit_codes.py            # POSIX ExitCode constants (0 to 8)
+│   │   │   ├── git.py                   # Local Git service (safe subprocess, diff redaction, state parsing, branch management, staging, commit, push)
 │   │   │   └── repository.py            # GitStatus, path traversal defense, sensitive file scan
 │   │   └── output/                      # Terminal & JSON presentation
 │   │       ├── __init__.py
 │   │       ├── json.py                  # Machine-readable JSON output on stdout
 │   │       └── terminal.py              # Rich Cyber Brutalist formatting with design tokens
-│   └── tests/                           # CLI automated test suite (47 tests)
+│   └── tests/                           # CLI automated test suite (136 tests)
 │       ├── __init__.py
 │       ├── test_approvals_and_policy.py # ApprovalPolicy, RiskLevel, and ExecutionPolicy tests (7 tests)
-│       ├── test_cli_commands.py         # End-to-end command integration tests (16 tests)
-│       ├── test_client.py               # HTTP client retries, timeouts, and headers (6 tests)
-│       ├── test_config.py               # Layer precedence, secret redaction, schema (5 tests)
-│       ├── test_exit_codes_and_exceptions.py # Domain exceptions and POSIX exit codes (3 tests)
-│       ├── test_output.py               # Terminal & JSON formatting tests (3 tests)
-│       └── test_repository.py           # Path traversal, sensitive files, summary tests (7 tests)
+│       ├── test_auth.py                 # CLI PKCE and credentials vault tests (12 tests)
+│       ├── test_auth_github.py          # GitHub CLI authentication tests (5 tests)
+│       ├── test_cli_commands.py         # Typer argument hoisting and command execution tests (16 tests)
+│       ├── test_client.py               # Django API client tests (6 tests)
+│       ├── test_config.py               # Layered config & TOML serialization tests (5 tests)
+│       ├── test_exit_codes_and_exceptions.py # POSIX exit code mapping tests (3 tests)
+│       ├── test_git.py                  # Local Git inspection test suite (22 tests)
+│       ├── test_git_operations.py       # Safe Git operations (branch, stage, commit, push, plan) tests (29 tests)
+│       ├── test_output.py               # Cyber Brutalist terminal output tests (3 tests)
+│       ├── test_pr.py                   # Pull Request integration test suite (12 tests)
+│       ├── test_repos.py                # GitHub repository discovery CLI tests (9 tests)
+│       └── test_repository.py           # Repository path validation tests (7 tests)
 │
 ├── frontend/                            # React web application (Step 8 Foundation)
 │   ├── index.html                       # HTML entry point with Cyber Brutalist fonts
 │   ├── package.json                     # Frontend dependencies & scripts (pure JS)
-│   ├── vite.config.js                   # Vite config, dev server proxy & Vitest setup
+│   ├── vite.config.js                   # Vite config, dev server proxy (/api, /health) & Vitest setup
 │   ├── tailwind.config.js               # Cyber Brutalist tokens, colors, & typography
 │   ├── postcss.config.js                # PostCSS Tailwind & Autoprefixer plugin config
 │   ├── public/                          # Static assets and icons
@@ -203,6 +234,8 @@ nex - ai software engineer/
 │   │   │   ├── auth/                    # Authentication guards & dialogs
 │   │   │   │   ├── AccountLinkingModal.jsx # Multi-provider identity conflict & credential linking modal
 │   │   │   │   └── ProtectedRoute.jsx   # Route guard with auth & role check
+│   │   │   ├── github/                  # GitHub App Integration components
+│   │   │   │   └── GitHubIntegrationCard.jsx # GitHub App authorization, connection status & disconnect modal
 │   │   │   ├── ui/                      # Cyber Brutalist UI Kit
 │   │   │   │   ├── Button.jsx           # Variants (primary, secondary, outline, danger, cyan)
 │   │   │   │   ├── Input.jsx            # Form input with icon, error, and monospace styling
@@ -245,41 +278,51 @@ nex - ai software engineer/
 │   │   │   │   ├── RegisterPage.jsx     # Registration with email verification flow
 │   │   │   │   ├── ForgotPasswordPage.jsx # Password reset email request
 │   │   │   │   └── CliAuthConsentPage.jsx # CLI OAuth PKCE approval & callback consent
-│   │   │   ├── DashboardPage.jsx        # System control dashboard & UI kit showcase
-│   │   │   ├── ProjectsPage.jsx         # Codebase & repositories placeholder shell
-│   │   │   ├── RunsPage.jsx             # Agent runs & LangGraph execution shell
-│   │   │   ├── ApprovalsPage.jsx        # Human-in-the-loop approvals shell
-│   │   │   ├── HistoryPage.jsx          # Immutable audit log shell
-│   │   │   ├── SettingsPage.jsx         # Gateway & workspace configuration shell
+│   │   │   ├── DashboardPage.jsx        # Live system control dashboard (telemetry, repositories, Git activity, shortcuts)
+│   │   │   ├── ProjectsPage.jsx         # Projects & Repositories dashboard (metrics, filters, sync, tabs, PR preview & creation)
+│   │   │   ├── RunsPage.jsx             # Agent runs & LangGraph execution shell (CLI workflow guide & runs telemetry)
+│   │   │   ├── ApprovalsPage.jsx        # Human-in-the-loop approvals (pending ops, 4-tier policy matrix, audit trail)
+│   │   │   ├── HistoryPage.jsx          # Immutable audit log (searchable, filterable, paginated Git operations)
+│   │   │   ├── SettingsPage.jsx         # Identity credentials, password reset, GitHub App, CLI sessions, API architecture
 │   │   │   └── NotFoundPage.jsx         # 404 terminal-style error page
 │   │   ├── services/
 │   │   │   ├── index.js                 # Centralized services export
 │   │   │   ├── api.js                   # Axios client with correlation ID & token refresh
 │   │   │   ├── authApi.js               # Dedicated authentication and CLI API endpoints
+│   │   │   ├── githubApi.js             # Dedicated GitHub App authorization & disconnect API
+│   │   │   ├── repositoryApi.js         # Repository listing, detail, sync, Git operations, and PR API
+│   │   │   ├── runsApi.js               # Agent execution runs API service boundary
 │   │   │   ├── systemApi.js             # Liveness and readiness system health probes
 │   │   │   ├── firebase.js              # Firebase SDK singleton and auth helper methods
 │   │   │   └── errorHandler.js          # Django error envelope normalization (DRF + status)
 │   │   └── styles/
 │   │       └── index.css                # CSS variables, modern <dialog> & brutal scrollbars
-│   └── tests/                           # Vitest component & unit tests (83 tests)
+│   └── tests/                           # Vitest component & unit tests (125 tests across 23 test suites)
 │       ├── vitest.setup.js              # JSDOM polyfills & setup
 │       ├── test-utils.jsx               # Custom render with Redux and MemoryRouter
 │       ├── AccountLinkingModal.test.jsx # Account linking & credential merge flow tests (7 tests)
 │       ├── api.test.js                  # Axios configuration, interceptor & retry tests (9 tests)
+│       ├── AppLayout.test.jsx           # App layout navigation & shell tests (4 tests)
+│       ├── ApprovalsPage.test.jsx       # Approvals page tabs, policy matrix & pending badges (4 tests)
 │       ├── authApi.test.js              # Dedicated authApi endpoint & sync tests (10 tests)
-│       ├── systemApi.test.js            # System health probe tests (2 tests)
-│       ├── env.test.js                  # Environment diagnostics tests (2 tests)
-│       ├── firebase.test.js             # Firebase auth methods & error mapping tests (9 tests)
-│       ├── authSlice.test.js            # Redux authSlice reducer & lifecycle tests (8 tests)
-│       ├── AppLayout.test.jsx           # Layout rendering and drawer tests (4 tests)
-│       ├── Button.test.jsx              # Button variants, states, and click tests (5 tests)
-│       ├── CliAuthConsentPage.test.jsx  # CLI PKCE consent page tests (3 tests)
-│       ├── ErrorBoundary.test.jsx       # Error boundary crash and recovery tests (3 tests)
-│       ├── errorHandler.test.js         # Django error envelope normalization tests (8 tests)
-│       ├── Modal.test.jsx               # HTML5 dialog modal behavior tests (2 tests)
-│       ├── NotFoundPage.test.jsx        # 404 page rendering tests (1 test)
-│       ├── ProtectedRoute.test.jsx      # Route guard & redirection tests (5 tests)
-│       └── uiSlice.test.js              # Redux UI state reducer tests (5 tests)
+│       ├── authSlice.test.js            # Redux auth slice reducers & actions (8 tests)
+│       ├── Button.test.jsx              # Button variants & state tests (5 tests)
+│       ├── CliAuthConsentPage.test.jsx  # CLI PKCE authorization consent tests (3 tests)
+│       ├── DashboardPage.test.jsx       # Live telemetry, metrics, activity & refresh tests (5 tests)
+│       ├── env.test.js                  # Environment configuration validation (2 tests)
+│       ├── ErrorBoundary.test.jsx       # Crash capture & fallback rendering (3 tests)
+│       ├── errorHandler.test.js         # DRF error envelope normalization (8 tests)
+│       ├── firebase.test.js             # Firebase auth provider & token tests (9 tests)
+│       ├── GitHubIntegrationCard.test.jsx # GitHub App connect & disconnect flow tests (5 tests)
+│       ├── HistoryPage.test.jsx         # Immutable audit log search, filter & copy tests (4 tests)
+│       ├── Modal.test.jsx               # HTML5 native dialog modal tests (2 tests)
+│       ├── NotFoundPage.test.jsx        # 404 page rendering & navigation (1 test)
+│       ├── ProjectsPage.test.jsx        # Repository dashboard, filters, sync, tabs & PR tests (15 tests)
+│       ├── ProtectedRoute.test.jsx      # Auth route guard & redirect tests (5 tests)
+│       ├── RunsPage.test.jsx            # Agent execution guide & runs list tests (3 tests)
+│       ├── SettingsPage.test.jsx        # Profile, CLI sessions, revoke & API gateway tests (5 tests)
+│       ├── systemApi.test.js            # System health probe tests (3 tests)
+│       └── uiSlice.test.js              # Redux UI state slice tests (5 tests)
 │
 ├── packages/
 │   └── shared/                          # Shared code across services (empty)

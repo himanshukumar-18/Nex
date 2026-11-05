@@ -20,10 +20,12 @@ from nex.commands.auth import app as auth_app
 from nex.commands.auth import logout, whoami
 from nex.commands.config import app as config_app
 from nex.commands.fix import fix
+from nex.commands.git import app as git_app
 from nex.commands.init import init
 from nex.commands.inspect import inspect
 from nex.commands.login import login
-from nex.commands.pr import pr
+from nex.commands.pr import app as pr_app
+from nex.commands.repos import app as repos_app
 from nex.commands.review import review
 from nex.commands.runs import app as runs_app
 from nex.commands.security import security
@@ -244,9 +246,6 @@ app.command(
     name="security",
     help="Scan local repository workspace for credentials and sensitive files.",
 )(security)
-app.command(
-    name="pr", help="Prepare and publish a pull request to the remote repository."
-)(pr)
 app.command(name="login", help="Authenticate with NEX via browser OAuth with PKCE.")(
     login
 )
@@ -254,19 +253,13 @@ app.command(name="logout", help="Sign out and revoke active CLI credentials.")(l
 app.command(name="whoami", help="Display currently authenticated NEX user profile.")(
     whoami
 )
-app.command(
-    name="login", help="Authenticate with NEX via browser OAuth with PKCE."
-)(login)
-app.command(
-    name="logout", help="Sign out and revoke active CLI credentials."
-)(logout)
-app.command(
-    name="whoami", help="Display currently authenticated NEX user profile."
-)(whoami)
 
 # Register command groups with subcommands
 app.add_typer(auth_app, name="auth")
 app.add_typer(config_app, name="config")
+app.add_typer(git_app, name="git")
+app.add_typer(pr_app, name="pr")
+app.add_typer(repos_app, name="repos")
 app.add_typer(runs_app, name="runs")
 
 

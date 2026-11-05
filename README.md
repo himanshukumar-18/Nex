@@ -2,7 +2,7 @@
 
 NEX is a proprietary, full-stack AI software engineering platform that helps developers understand, modify, test, review, and ship code through intelligent automation.
 
-> **Project status: Step 10 Production-Grade Authentication & Identity Security Implemented & Verified.** Unified identity system powered by Firebase Authentication across the React Web Application, Django REST Backend, and Python CLI. Features Google and GitHub OAuth, Email/Password, Email Verification, Password Reset, Django RBAC roles (`member`, `developer`, `admin`), immutable security audit logging (`SecurityAuditEvent`), RFC 7636 / RFC 8252 PKCE browser-based authorization code flow for the CLI, and secure OS Keyring credential storage with encrypted file fallback. Combined platform automated test coverage: **315/315 verified tests passing** (139 Django backend + 34 FastAPI agent-runtime + 83 React frontend + 59 Python CLI). All Docker services operational and healthy.
+> **Project status: Step 11 Completed & Frontend Fully Integrated.** Unified identity system powered by Firebase Authentication across React, Django, and CLI. Step 11 adds complete local Git repository inspection (`nex git *`), production-grade GitHub App authorization (`nex auth github`), comprehensive repository discovery, pagination, PostgreSQL persistence with safe tombstoning, REST API (`/api/v1/repositories/`), safe Git mutations, Pull Request automation (`nex pr`), and end-to-end React frontend integration (`frontend/src/`). Combined platform automated test coverage: **490/490 verified tests passing** (195 Django backend + 34 FastAPI agent-runtime + 125 React frontend + 136 Python CLI). All Docker services operational and healthy.
 
 ---
 
@@ -182,11 +182,52 @@ The `nex` executable is installed via standard Python packaging (`pyproject.toml
 ./.venv/bin/nex config get general.default_model
 ./.venv/bin/nex config set general.default_model "gemini-2.0-flash"
 
+# Local Git inspection and repository diagnostics (Step 11 Phase 1)
+./.venv/bin/nex git status                       # Working tree status, merge/rebase state, staged/unstaged
+./.venv/bin/nex git status --json                # Machine-readable JSON output
+./.venv/bin/nex git branches                     # List local branches and tracking status
+./.venv/bin/nex git branches -a                  # Include remote-tracking branches
+./.venv/bin/nex git log -n 5                     # View recent commit history
+./.venv/bin/nex git diff                         # Inspect unified diffs (sensitive files/tokens redacted)
+./.venv/bin/nex git diff --staged                # Inspect staged changes only
+./.venv/bin/nex git diff --stat                  # Summary of file additions/deletions
+./.venv/bin/nex git remotes                      # Configured remote repository URLs
+./.venv/bin/nex git inspect                      # Complete repository health audit and diagnostic
+
 # Inspect historical agent execution runs from Django backend
 ./.venv/bin/nex runs list
 ./.venv/bin/nex runs get <run-uuid>
 
-# Run CLI automated unit and integration test suite (47 tests)
+# Inspect and manage authorized GitHub App installations (Step 11 Phase 2)
+./.venv/bin/nex auth github                      # Display connected GitHub account and installations
+./.venv/bin/nex auth github --connect            # Initiate browser-based GitHub App authorization
+./.venv/bin/nex auth github --json               # Machine-readable JSON output
+
+# Discover, sync, and inspect GitHub repositories (Step 11 Phase 3)
+./.venv/bin/nex repos list                       # List synchronized repositories (formatted table)
+./.venv/bin/nex repos list --visibility private  # Filter by private or public repositories
+./.venv/bin/nex repos list --search "core"       # Search repositories by name or description
+./.venv/bin/nex repos list --json                # Machine-readable JSON repository list
+./.venv/bin/nex repos sync                       # Trigger manual sync across active installations
+./.venv/bin/nex repos show <owner/repo>          # Display repository details, clone URLs, and metadata
+
+# Safe Git operations with approval policy & stale-plan detection (Step 11 Phase 4)
+./.venv/bin/nex git branch list                  # List local and remote branches
+./.venv/bin/nex git branch create <name>         # Safely create branch with validation (--dry-run supported)
+./.venv/bin/nex git branch switch <name>         # Safely switch branch (enforces clean working tree)
+./.venv/bin/nex git stage <files...>             # Selectively stage files (blocks wildcards & sensitive files)
+./.venv/bin/nex git unstage <files...>           # Selectively unstage files from Git index
+./.venv/bin/nex git staged                       # Inspect staged metrics and redacted diff preview
+./.venv/bin/nex git commit -m "<message>"        # Commit staged changes with preview & developer approval
+./.venv/bin/nex git push [--remote] [--branch]   # Push approved branch via secure GIT_ASKPASS token helper
+
+# Pull Request integration with preview fingerprinting & approval (Step 11 Phase 5)
+./.venv/bin/nex pr [--base main] [--title "..."] # Preview & publish PR with CRITICAL-risk approval
+./.venv/bin/nex pr --dry-run                     # Preview commit/file comparison without publishing
+./.venv/bin/nex pr list [--state open|all]       # List repository pull requests with status badges
+./.venv/bin/nex pr view <number> [--sync]        # Inspect PR details and sync live GitHub status
+
+# Run CLI automated unit and integration test suite (136 tests)
 ./.venv/bin/pytest cli/tests/
 
 # Run CLI linting and type checking
@@ -220,6 +261,52 @@ docker compose exec redis redis-cli
 # View service logs
 docker compose logs -f backend
 ```
+
+---
+
+### GitHub App Configuration & Setup URL Reference
+
+- **GitHub App Setup URL (Backend Callback)**: `http://localhost:8080/api/v1/repositories/github/callback/`
+  - Configured in the GitHub App settings under **Setup URL** (redirect on install).
+  - GitHub redirects here on both fresh installations and configuration updates (`github.com/settings/installations/<id>`).
+  - Fresh installs are validated with single-use Redis cryptographic state tokens (anti-replay defense).
+  - Updates from existing installations without state are safely reconciled for verified existing users (unbound installations are rejected with `UNVERIFIED_INSTALLATION`).
+  - Note: **OAuth Callback URL** is **not required** for the installation-only flow because authorization relies on the GitHub App Setup URL and installation tokens.
+- **Frontend Redirect Destination (`GITHUB_APP_CALLBACK_URL`)**: `http://localhost:3000/settings`
+  - Once the backend processes the installation callback, it redirects the browser to this frontend URL with query parameters (`?github=connected` or `?github=connected&sync=failed`).
+- **Webhook Endpoint**: `http://localhost:8080/api/v1/repositories/github/webhook/`
+  - Receives installation, repository, and pull request lifecycle events.
+  - Payloads are verified via constant-time HMAC-SHA256 against `GITHUB_WEBHOOK_SECRET`.
+- **Private Key Configuration & Docker Mount**:
+  - Store your 2048-bit RSA PEM key on the host at `./secrets/github-app-private-key.pem`.
+  - The key is mounted read-only into the Django backend container at `/run/secrets/github-app-private-key.pem:ro`.
+  - Configured via `GITHUB_APP_PRIVATE_KEY_PATH=/run/secrets/github-app-private-key.pem`.
+  - The key is validated with strict cryptographic checks (rejecting SHA256 fingerprints, public keys, or non-PEM strings).
+- **Required Minimum Permissions (Repository)**:
+  - `Metadata`: Read-only (mandatory for all GitHub Apps)
+  - `Contents`: Read and write (for repository inspection, file staging, branch creation, commit creation, and git push)
+  - `Pull requests`: Read and write (for pull request creation, listing, inspection, and live sync)
+- **Required Webhook Events**:
+  - `Installation` (installation lifecycle: created, deleted, suspend)
+  - `Installation target` / `Installation repositories` (repository access changes: added, removed)
+  - `Repository` (repository lifecycle: created, deleted, archived, renamed)
+  - `Pull request` (PR lifecycle: opened, closed, synchronized, edited)
+- **Local Webhook Testing (HTTPS Tunnel)**:
+  - GitHub webhooks require a publicly accessible HTTPS endpoint. For local development, establish an HTTPS tunnel:
+    ```bash
+    # Option A: ngrok
+    ngrok http 8080
+
+    # Option B: Cloudflare Tunnel
+    cloudflared tunnel --url http://localhost:8080
+    ```
+  - In your GitHub App settings, set **Webhook URL** to:
+    `https://<your-tunnel-subdomain>/api/v1/repositories/github/webhook/`
+  - Set **Webhook secret** to match `GITHUB_WEBHOOK_SECRET` in `.env`.
+- **Security Notice on Installation Linking**:
+  - Insecure manual linking by Installation ID has been completely removed to prevent unauthorized installation hijacking. All installation bindings require verified cryptographic state tokens or Setup URL owner verification.
+- **Frontend Development Proxy**:
+  - In `frontend/vite.config.js`, both `/api` and `/health` are proxied to `http://localhost:8080`.
 
 ---
 

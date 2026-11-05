@@ -30,5 +30,10 @@ describe('systemApi Service', () => {
     expect(api.get).toHaveBeenCalledWith('/health/ready/', { baseURL: '' });
     expect(result).toEqual(mockData);
   });
+
+  it('propagates error when health endpoint fails', async () => {
+    api.get.mockRejectedValueOnce(new Error('Network error'));
+    await expect(systemApi.getLiveness()).rejects.toThrow('Network error');
+  });
 });
 

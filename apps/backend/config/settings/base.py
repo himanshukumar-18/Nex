@@ -49,6 +49,7 @@ LOCAL_APPS: list[str] = [
     "apps.api",
     "apps.accounts",
     "apps.audit_logs",
+    "apps.repositories",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -322,6 +323,23 @@ AGENT_RUNTIME_POOL_TIMEOUT: float = 5.0
 FIREBASE_PROJECT_ID: str = env("FIREBASE_PROJECT_ID", default="")
 FIREBASE_CREDENTIALS_PATH: str = env("FIREBASE_CREDENTIALS_PATH", default="")
 FIREBASE_CREDENTIALS_JSON: str = env("FIREBASE_CREDENTIALS_JSON", default="")
+
+# ---------------------------------------------------------------------------
+# GitHub App Configuration (Step 11 — Repository Authorization & Integration)
+# ---------------------------------------------------------------------------
+
+GITHUB_APP_ID: str = env("GITHUB_APP_ID", default="")
+GITHUB_APP_SLUG: str = env("GITHUB_APP_SLUG", default="nex-engineering-assistant")
+GITHUB_APP_CLIENT_ID: str = env("GITHUB_APP_CLIENT_ID", default="")
+GITHUB_APP_CLIENT_SECRET: str = env("GITHUB_APP_CLIENT_SECRET", default="")
+GITHUB_APP_PRIVATE_KEY_PATH: str = env(
+    "GITHUB_APP_PRIVATE_KEY_PATH", default="/run/secrets/github-app-private-key.pem"
+)
+GITHUB_APP_PRIVATE_KEY: str = env("GITHUB_APP_PRIVATE_KEY", default="")
+GITHUB_WEBHOOK_SECRET: str = env("GITHUB_WEBHOOK_SECRET", default="")
+GITHUB_APP_CALLBACK_URL: str = env(
+    "GITHUB_APP_CALLBACK_URL", default="http://localhost:3000/settings"
+)
 
 # ---------------------------------------------------------------------------
 # Cross-Origin Resource Sharing (CORS) Configuration

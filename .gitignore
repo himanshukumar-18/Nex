@@ -68,3 +68,5 @@ temp/
 secrets/
 *.service-account.json
 firebase-service-account.json
+*.pem
+*.key

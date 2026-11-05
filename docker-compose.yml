@@ -87,9 +87,18 @@ services:
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-nex---ai-software-engineer}
       FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-/run/secrets/firebase-service-account.json}
       FIREBASE_CREDENTIALS_JSON: ${FIREBASE_CREDENTIALS_JSON:-}
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_SLUG: ${GITHUB_APP_SLUG:-nex-engineering-assistant}
+      GITHUB_APP_CLIENT_ID: ${GITHUB_APP_CLIENT_ID:-}
+      GITHUB_APP_CLIENT_SECRET: ${GITHUB_APP_CLIENT_SECRET:-}
+      GITHUB_APP_PRIVATE_KEY_PATH: ${GITHUB_APP_PRIVATE_KEY_PATH:-/run/secrets/github-app-private-key.pem}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      GITHUB_APP_CALLBACK_URL: ${GITHUB_APP_CALLBACK_URL:-http://localhost:3000/settings}
     volumes:
       - ./apps/backend:/app
       - ./secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
+      - ./secrets/github-app-private-key.pem:/run/secrets/github-app-private-key.pem:ro
     depends_on:
       postgres:
         condition: service_healthy
